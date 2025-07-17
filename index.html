@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Visor de Incendios Urbanos con Clusters</title>
+  <title>Visor de Incendios con Filtro</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -22,12 +22,32 @@
 
   <style>
     #map {
-      height: 100vh;
+      height: 90vh;
       width: 100%;
+    }
+    #filters {
+      padding: 10px;
+      background: white;
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      box-shadow: 0 0 6px rgba(0,0,0,0.3);
+      border-radius: 5px;
     }
   </style>
 </head>
 <body>
+
+<div id="filters">
+  <label><input type="checkbox" value="Quema de basura" checked> Quema de basura</label><br>
+  <label><input type="checkbox" value="Casa habitacion" checked> Casa habitación</label><br>
+  <label><input type="checkbox" value="Vehiculo" checked> Vehículo</label><br>
+  <label><input type="checkbox" value="Arbol" checked> Árbol</label><br>
+  <label><input type="checkbox" value="Industria" checked> Industria</label><br>
+  <label><input type="checkbox" value="Edificio" checked> Edificio</label><br>
+  <label><input type="checkbox" value="Negocio plaza comercial mercado" checked> Negocio/plaza/mercado</label><br>
+</div>
 
 <div id="map"></div>
 
@@ -44,29 +64,46 @@
     attribution: '&copy; OpenStreetMap contributors',
   }).addTo(map);
 
-  // Crear un grupo para clusters
-  var markers = L.markerClusterGroup();
+  var allMarkers = L.markerClusterGroup();
+  var allData = null; // para guardar todo el geojson
 
-  // Cargar GeoJSON y agregar al grupo de clusters
+  // Cargar GeoJSON
   fetch('Incendios Urbanos 2022.geojson')
-    .then((response) => response.json())
-    .then((data) => {
-      var geoJsonLayer = L.geoJSON(data, {
-        onEachFeature: function (feature, layer) {
-          var props = feature.properties;
-          var popupContent = "<b>Incidente:</b> " + props.incidente_c4 + "<br>" +
-                             "<b>Alcaldía:</b> " + props.alcaldia_cierre + "<br>" +
-                             "<b>Colonia:</b> " + props.colonia_cierre;
-          layer.bindPopup(popupContent);
-        }
-      });
-      markers.addLayer(geoJsonLayer);
-      map.addLayer(markers);
-    })
-    .catch((error) => {
-      console.error('Error cargando el GeoJSON:', error);
-      alert('No se pudo cargar el archivo de datos.');
+    .then(response => response.json())
+    .then(data => {
+      allData = data;
+      updateMarkers();
     });
+
+  function updateMarkers() {
+    allMarkers.clearLayers();
+
+    // Obtener los incidentes seleccionados
+    let checkedTypes = Array.from(document.querySelectorAll('#filters input[type=checkbox]:checked'))
+      .map(cb => cb.value);
+
+    // Filtrar features según selección
+    let filteredFeatures = allData.features.filter(f => checkedTypes.includes(f.properties.incidente_c4));
+
+    // Crear capa geojson filtrada
+    let filteredLayer = L.geoJSON(filteredFeatures, {
+      onEachFeature: function(feature, layer) {
+        var props = feature.properties;
+        var popupContent = "<b>Incidente:</b> " + props.incidente_c4 + "<br>" +
+                           "<b>Alcaldía:</b> " + props.alcaldia_cierre + "<br>" +
+                           "<b>Colonia:</b> " + props.colonia_cierre;
+        layer.bindPopup(popupContent);
+      }
+    });
+
+    allMarkers.addLayer(filteredLayer);
+    map.addLayer(allMarkers);
+  }
+
+  // Escuchar cambios en los checkboxes para actualizar mapa
+  document.querySelectorAll('#filters input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', updateMarkers);
+  });
 </script>
 
 </body>
