@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Visor de Incendios con Filtro</title>
+  <title>Visor con filtro</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet CSS -->
+  <!-- Google Fonts: Roboto -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
   />
-  <!-- MarkerCluster CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"
@@ -26,20 +27,34 @@
       width: 100%;
     }
     #filters {
-      padding: 10px;
-      background: white;
-      position: absolute;
-      top: 10px;
+      position: fixed;
+      top: 70px;
       left: 10px;
-      z-index: 1000;
-      box-shadow: 0 0 6px rgba(0,0,0,0.3);
-      border-radius: 5px;
+      background: white;
+      padding: 15px 20px;
+      border-radius: 8px;
+      z-index: 10000;
+      box-shadow: 0 0 8px rgba(0,0,0,0.3);
+      max-height: 320px;
+      overflow-y: auto;
+      width: 240px;
+      font-family: 'Roboto', Arial, sans-serif;
+      font-size: 15px;
+      color: #222;
+    }
+    #filters h2 {
+      font-weight: 700;
+      font-size: 18px;
+      margin-top: 0;
+      margin-bottom: 12px;
+      color: #111;
     }
   </style>
 </head>
 <body>
 
 <div id="filters">
+  <h2>Filtro de Incidentes</h2>
   <label><input type="checkbox" value="Quema de basura" checked> Quema de basura</label><br>
   <label><input type="checkbox" value="Casa habitacion" checked> Casa habitación</label><br>
   <label><input type="checkbox" value="Vehiculo" checked> Vehículo</label><br>
@@ -51,9 +66,7 @@
 
 <div id="map"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- MarkerCluster JS -->
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
@@ -65,9 +78,8 @@
   }).addTo(map);
 
   var allMarkers = L.markerClusterGroup();
-  var allData = null; // para guardar todo el geojson
+  var allData = null;
 
-  // Cargar GeoJSON
   fetch('Incendios Urbanos 2022.geojson')
     .then(response => response.json())
     .then(data => {
@@ -78,21 +90,15 @@
   function updateMarkers() {
     allMarkers.clearLayers();
 
-    // Obtener los incidentes seleccionados
     let checkedTypes = Array.from(document.querySelectorAll('#filters input[type=checkbox]:checked'))
       .map(cb => cb.value);
 
-    // Filtrar features según selección
     let filteredFeatures = allData.features.filter(f => checkedTypes.includes(f.properties.incidente_c4));
 
-    // Crear capa geojson filtrada
     let filteredLayer = L.geoJSON(filteredFeatures, {
       onEachFeature: function(feature, layer) {
-        var props = feature.properties;
-        var popupContent = "<b>Incidente:</b> " + props.incidente_c4 + "<br>" +
-                           "<b>Alcaldía:</b> " + props.alcaldia_cierre + "<br>" +
-                           "<b>Colonia:</b> " + props.colonia_cierre;
-        layer.bindPopup(popupContent);
+        var p = feature.properties;
+        layer.bindPopup(`<b>Incidente:</b> ${p.incidente_c4}<br><b>Alcaldía:</b> ${p.alcaldia_cierre}<br><b>Colonia:</b> ${p.colonia_cierre}`);
       }
     });
 
@@ -100,7 +106,6 @@
     map.addLayer(allMarkers);
   }
 
-  // Escuchar cambios en los checkboxes para actualizar mapa
   document.querySelectorAll('#filters input[type=checkbox]').forEach(cb => {
     cb.addEventListener('change', updateMarkers);
   });
