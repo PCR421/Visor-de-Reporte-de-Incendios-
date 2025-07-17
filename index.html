@@ -1,118 +1,131 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
   <meta charset="utf-8" />
   <title>Visor de Reporte de Incendios</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+
+  <!-- Leaflet base -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Leaflet MarkerCluster -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
   <style>
-    body {
-      margin: 0;
-      font-family: "Segoe UI", Roboto, sans-serif;
+    body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+    #map { height: 100vh; }
+    #filtro {
+      position: absolute;
+      top: 70px;
+      right: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
     }
-
-    h1 {
+    h2 {
       text-align: center;
-      font-size: 2em;
-      margin: 1em 0 0.5em 0;
-      color: #333;
-    }
-
-    #map {
-      height: 80vh;
-      width: 100%;
-    }
-
-    #filters {
-      padding: 1em;
-      background-color: #f9f9f9;
-      border-top: 1px solid #ccc;
-      font-size: 1em;
-    }
-
-    #filters label {
-      display: inline-block;
-      margin-right: 1em;
+      padding: 10px;
+      margin: 0;
+      background-color: #be4c39;
+      color: white;
+      font-size: 20px;
     }
   </style>
 </head>
 <body>
 
-  <h1>Visor de Reporte de Incendios 2022</h1>
-
+  <h2>Visor de Reporte de Incendios</h2>
   <div id="map"></div>
-
-  <div id="filters">
-    <strong>Filtrar por tipo de incidente:</strong><br>
-    <label><input type="checkbox" value="Quema de basura" checked> Quema de basura</label>
-    <label><input type="checkbox" value="Casa habitacion" checked> Casa habitación</label>
-    <label><input type="checkbox" value="Vehiculo" checked> Vehículo</label>
-    <label><input type="checkbox" value="Edificio" checked> Edificio</label>
-    <label><input type="checkbox" value="Industria" checked> Industria</label>
-    <label><input type="checkbox" value="Arbol" checked> Árbol</label>
-    <label><input type="checkbox" value="Negocio plaza comercial mercado" checked> Negocio</label>
+  <div id="filtro">
+    <label for="incidente">Filtrar por tipo:</label><br>
+    <select id="incidente">
+      <option value="">Todos</option>
+    </select>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([19.4, -99.1], 11);
-
+    const map = L.map('map').setView([19.4, -99.14], 11);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
+      maxZoom: 19
     }).addTo(map);
 
-    let geojsonLayer;
+    let radioCapa = null;
+
     fetch('Incendios Urbanos 2022.geojson')
-      .then(res => res.json())
+      .then(response => response.json())
       .then(data => {
-        geojsonLayer = L.geoJSON(data, {
-          onEachFeature: function (feature, layer) {
-            layer.bindPopup(`
+        const tipoSet = new Set();
+        const markers = L.markerClusterGroup();
+
+        const capa = L.geoJSON(data, {
+          pointToLayer: function (feature, latlng) {
+            const marker = L.marker(latlng);
+            marker.bindPopup(`
               <strong>${feature.properties.incidente_c4}</strong><br>
               Alcaldía: ${feature.properties.alcaldia_cierre}<br>
               Colonia: ${feature.properties.colonia_cierre}
             `);
+
+            marker.on('click', function () {
+              if (radioCapa) map.removeLayer(radioCapa);
+              radioCapa = L.circle(latlng, {
+                radius: 500,
+                color: 'red',
+                fillColor: '#f03',
+                fillOpacity: 0.2
+              }).addTo(map);
+            });
+
+            tipoSet.add(feature.properties.incidente_c4);
+            return marker;
           }
-        }).addTo(map);
-        updateMarkers();
+        });
+
+        markers.addLayer(capa);
+        map.addLayer(markers);
+
+        // Filtro dinámico
+        const selector = document.getElementById('incidente');
+        tipoSet.forEach(tipo => {
+          const option = document.createElement('option');
+          option.value = tipo;
+          option.textContent = tipo;
+          selector.appendChild(option);
+        });
+
+        selector.addEventListener('change', function () {
+          const valor = this.value;
+          markers.clearLayers();
+          const nuevaCapa = L.geoJSON(data, {
+            pointToLayer: function (feature, latlng) {
+              if (valor && feature.properties.incidente_c4 !== valor) return;
+              const marker = L.marker(latlng).bindPopup(`
+                <strong>${feature.properties.incidente_c4}</strong><br>
+                Alcaldía: ${feature.properties.alcaldia_cierre}<br>
+                Colonia: ${feature.properties.colonia_cierre}
+              `);
+
+              marker.on('click', function () {
+                if (radioCapa) map.removeLayer(radioCapa);
+                radioCapa = L.circle(latlng, {
+                  radius: 500,
+                  color: 'red',
+                  fillColor: '#f03',
+                  fillOpacity: 0.2
+                }).addTo(map);
+              });
+
+              return marker;
+            }
+          });
+          markers.addLayer(nuevaCapa);
+        });
       });
-
-    function updateMarkers() {
-      const checkboxes = document.querySelectorAll('#filters input[type=checkbox]');
-      const activos = Array.from(checkboxes)
-        .filter(cb => cb.checked)
-        .map(cb => cb.value);
-
-      geojsonLayer.eachLayer(layer => {
-        const tipo = layer.feature.properties.incidente_c4;
-        if (activos.includes(tipo)) {
-          layer.addTo(map);
-        } else {
-          map.removeLayer(layer);
-        }
-      });
-    }
-
-    document.querySelectorAll('#filters input[type=checkbox]').forEach(cb => {
-      cb.addEventListener('change', updateMarkers);
-    });
-
-    // 🎯 Herramienta de radio
-    let radio = 500; // metros
-    let circulo = null;
-
-    map.on('click', function(e) {
-      if (circulo) {
-        map.removeLayer(circulo);
-      }
-      circulo = L.circle(e.latlng, {
-        color: 'red',
-        fillColor: '#f03',
-        fillOpacity: 0.2,
-        radius: radio
-      }).addTo(map);
-      circulo.bindPopup(`Radio de ${radio} metros`).openPopup();
-    });
   </script>
 </body>
 </html>
