@@ -8,7 +8,6 @@
 <link
   rel="stylesheet"
   href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  integrity="sha256-sA+e2x0Dh6QhQQYB0cMClWcXdyc/NfNEl+o7PZY4nww="
   crossorigin=""
 />
 <style>
@@ -39,26 +38,20 @@
 <div id="map"></div>
 
 <!-- Leaflet JS -->
-<script
-  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-  integrity="sha256-o8WV7P5qqWmHoXBmfVAYW5tDkH+VwNGb6D3WrZlT8xo="
-  crossorigin=""
-></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
 <script>
-  // Inicializar mapa centrado en CDMX
   const map = L.map('map').setView([19.4, -99.14], 11);
 
-  // Capa base OSM
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // Variable para la capa GeoJSON (pon aquí tu archivo)
   let geojsonLayer = null;
+  let radioCapa = null;
+  let modoRadio = false;
 
-  // Carga GeoJSON (asegúrate que el archivo 'Incendios Urbanos 2022.geojson' esté en la misma carpeta)
   fetch('Incendios Urbanos 2022.geojson')
     .then(res => res.json())
     .then(data => {
@@ -83,21 +76,20 @@
           });
         }
       }).addTo(map);
+      console.log('GeoJSON cargado');
     })
     .catch(err => alert('Error cargando GeoJSON: ' + err));
 
-  // Control del botón de radio
-  let radioCapa = null;
-  let modoRadio = false;
-
   function activarHerramientaRadio() {
-    const radioBtn = document.getElementById('radioBtn');
     modoRadio = !modoRadio;
+    const radioBtn = document.getElementById('radioBtn');
     radioBtn.classList.toggle('active');
     radioBtn.textContent = modoRadio ? '🛑 Cancelar Radio' : '🎯 Activar Radio';
+    console.log('Modo radio:', modoRadio);
   }
 
   map.on('click', function(e) {
+    console.log('Mapa clickeado, modoRadio:', modoRadio);
     if (!modoRadio) return;
 
     if (radioCapa) map.removeLayer(radioCapa);
@@ -109,7 +101,6 @@
       fillOpacity: 0.2
     }).addTo(map);
 
-    // Contar incidentes dentro del radio
     let conteo = 0;
     if (geojsonLayer) {
       geojsonLayer.eachLayer(function(layer) {
@@ -125,4 +116,3 @@
 
 </body>
 </html>
-
