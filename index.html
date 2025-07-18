@@ -1,216 +1,147 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<title>Visor de Incendios - Resumen de Riesgo</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"
-/>
-<style>
-  body, html {
-    margin:0; padding:0; height:100%;
-    font-family: Arial, sans-serif;
-  }
-  #map { height: 60vh; }
-  #summary {
-    padding: 10px;
-    max-height: 35vh;
-    overflow-y: auto;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-  }
-  table, th, td {
-    border: 1px solid #666;
-  }
-  th, td {
-    padding: 6px;
-    text-align: center;
-  }
-  th {
-    background: #004466;
-    color: white;
-  }
-</style>
+  <meta charset="UTF-8">
+  <title>Visor de Reporte de Incendios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link 
+    rel="stylesheet" 
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+    integrity="sha256-sA+e2E4vFop2jzvWyZzgmVjsICaU9QnE1hzpJzD/+yM=" 
+    crossorigin=""
+  />
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; }
+    #map { height: 100vh; }
+    .controls {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    .risk-table {
+      margin-top: 10px;
+      border-collapse: collapse;
+      width: 100%;
+    }
+    .risk-table th, .risk-table td {
+      border: 1px solid #ccc;
+      padding: 4px;
+      font-size: 12px;
+      text-align: center;
+    }
+    h1 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+    select, button {
+      margin-top: 5px;
+      font-size: 12px;
+    }
+  </style>
 </head>
 <body>
-<h2 style="text-align:center; margin:10px;">Visor de Incendios Urbanos 2022</h2>
-<div id="map"></div>
-<div id="summary"><em>Dibuja un círculo para ver el resumen de riesgos dentro del área.</em></div>
+  <div class="controls">
+    <h1>Visor de Reporte de Incendios</h1>
+    <label>Filtrar por tipo de incidente:</label><br>
+    <select id="incidentFilter">
+      <option value="">Todos</option>
+    </select>
+    <br>
+    <button id="drawCircle">Trazar Radio (500m)</button>
+    <div id="riskSummary"></div>
+  </div>
 
-<script
-  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-></script>
-<script
-  src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"
-></script>
+  <div id="map"></div>
 
-<script>
-// Inicializar mapa centrado en CDMX
-const map = L.map("map").setView([19.43, -99.13], 11);
-
-// Agregar capa base OSM
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution: "© OpenStreetMap"
-}).addTo(map);
-
-// Cargar GeoJSON (puedes poner tu ruta correcta)
-const geojsonURL = "Incendios Urbanos 2022.geojson";
-
-let incidentsLayer;
-let incidentFeatures = [];
-
-fetch(geojsonURL)
-  .then(res => res.json())
-  .then(data => {
-    incidentFeatures = data.features;
-    incidentsLayer = L.geoJSON(data, {
-      pointToLayer: (feature, latlng) => {
-        return L.circleMarker(latlng, {
-          radius: 6,
-          fillColor: "#ff7800",
-          color: "#000",
-          weight: 1,
-          opacity: 1,
-          fillOpacity: 0.8
-        }).bindPopup(
-          `<b>Incidente:</b> ${feature.properties.incidente_c4}<br/>
-           <b>Alcaldía:</b> ${feature.properties.alcaldia_cierre}<br/>
-           <b>Colonia:</b> ${feature.properties.colonia_cierre}`
-        );
-      }
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([19.4, -99.15], 11);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
-  });
 
-// Añadir control de dibujo
-const drawnItems = new L.FeatureGroup();
-map.addLayer(drawnItems);
+    let geojsonLayer;
+    let allFeatures = [];
 
-const drawControl = new L.Control.Draw({
-  draw: {
-    polygon: false,
-    polyline: false,
-    rectangle: false,
-    marker: false,
-    circlemarker: false,
-    circle: {
-      shapeOptions: {
-        color: "#3388ff"
-      },
-      metric: true,
-      repeatMode: false
+    fetch("Incendios Urbanos 2022.geojson")
+      .then(response => response.json())
+      .then(data => {
+        allFeatures = data.features;
+
+        populateFilterOptions(allFeatures);
+        geojsonLayer = L.geoJSON(allFeatures, {
+          pointToLayer: (feature, latlng) => {
+            return L.circleMarker(latlng, { radius: 6, color: "#e03e3e" })
+              .bindPopup(`<strong>Incidente:</strong> ${feature.properties.incidente_c4}<br>
+                          <strong>Alcaldía:</strong> ${feature.properties.alcaldia_cierre}<br>
+                          <strong>Colonia:</strong> ${feature.properties.colonia_cierre}`);
+          }
+        }).addTo(map);
+      });
+
+    function populateFilterOptions(features) {
+      const select = document.getElementById('incidentFilter');
+      const types = [...new Set(features.map(f => f.properties.incidente_c4))].sort();
+      types.forEach(type => {
+        const opt = document.createElement('option');
+        opt.value = type;
+        opt.text = type;
+        select.appendChild(opt);
+      });
+      select.addEventListener('change', () => {
+        const selected = select.value;
+        const filtered = selected ? allFeatures.filter(f => f.properties.incidente_c4 === selected) : allFeatures;
+        if (geojsonLayer) map.removeLayer(geojsonLayer);
+        geojsonLayer = L.geoJSON(filtered, {
+          pointToLayer: (feature, latlng) => {
+            return L.circleMarker(latlng, { radius: 6, color: "#e03e3e" })
+              .bindPopup(`<strong>Incidente:</strong> ${feature.properties.incidente_c4}<br>
+                          <strong>Alcaldía:</strong> ${feature.properties.alcaldia_cierre}<br>
+                          <strong>Colonia:</strong> ${feature.properties.colonia_cierre}`);
+          }
+        }).addTo(map);
+      });
     }
-  },
-  edit: {
-    featureGroup: drawnItems,
-    remove: true
-  }
-});
-map.addControl(drawControl);
 
-// Función para calcular niveles según cantidad
-function calcularNivel(cantidad) {
-  if (cantidad > 100) return "Alto";
-  if (cantidad > 30) return "Medio";
-  if (cantidad > 0) return "Bajo";
-  return "Ninguno";
-}
-
-// Función para generar resumen de riesgo
-function generarResumen(conteos) {
-  const resumen = [];
-  for (const amenaza in conteos) {
-    const cantidad = conteos[amenaza];
-    const probabilidad = calcularNivel(cantidad);
-    const impacto = probabilidad; // simplificado, puede ajustarse
-    const riesgo = probabilidad;  // simplificado, puede ajustarse
-    const accionPreventiva = {
-      "Incendios forestales":
-        "Vigilancia constante, capacitación de brigadas, campañas de prevención y regulación de quemas.",
-      "Quema de basura":
-        "Promover la gestión adecuada de residuos y sancionar quemas irresponsables.",
-      "Casa habitacion":
-        "Mejorar medidas de prevención contra incendios domiciliarios.",
-      "Vehiculo":
-        "Inspección y control de riesgos en vehículos.",
-      "Arbol":
-        "Monitoreo y manejo adecuado de vegetación.",
-      "Industria":
-        "Regulación y supervisión de instalaciones industriales.",
-      "Edificio":
-        "Implementar protocolos de seguridad en edificaciones.",
-      "Negocio plaza comercial mercado":
-        "Capacitación y controles en establecimientos comerciales."
-    }[amenaza] || "Implementar acciones preventivas específicas para esta amenaza.";
-
-    resumen.push({
-      amenaza,
-      probabilidad,
-      impacto,
-      riesgo,
-      accionPreventiva
+    let drawnCircle;
+    document.getElementById("drawCircle").addEventListener("click", () => {
+      map.once("click", function(e) {
+        if (drawnCircle) map.removeLayer(drawnCircle);
+        drawnCircle = L.circle(e.latlng, { radius: 500, color: "blue", fillOpacity: 0.1 }).addTo(map);
+        const featuresInRadius = allFeatures.filter(f => {
+          const lat = f.geometry.coordinates[0][1];
+          const lng = f.geometry.coordinates[0][0];
+          return map.distance(e.latlng, L.latLng(lat, lng)) <= 500;
+        });
+        showRiskSummary(featuresInRadius);
+      });
     });
-  }
-  return resumen;
-}
 
-// Función para mostrar tabla resumen en el div #summary
-function mostrarResumen(resumen) {
-  if (resumen.length === 0) {
-    document.getElementById("summary").innerHTML = "<em>No hay incidentes dentro del área seleccionada.</em>";
-    return;
-  }
-  let html = `<table><thead><tr>
-    <th>Amenaza</th><th>Probabilidad</th><th>Impacto</th><th>Riesgo</th><th>Acción Preventiva</th>
-  </tr></thead><tbody>`;
-  resumen.forEach(r => {
-    html += `<tr>
-      <td>${r.amenaza}</td>
-      <td>${r.probabilidad}</td>
-      <td>${r.impacto}</td>
-      <td>${r.riesgo}</td>
-      <td style="text-align:left;">${r.accionPreventiva}</td>
-    </tr>`;
-  });
-  html += "</tbody></table>";
-  document.getElementById("summary").innerHTML = html;
-}
+    function showRiskSummary(features) {
+      const total = features.length;
+      const riesgo = total >= 10 ? 'Alto' : total >= 5 ? 'Medio' : 'Bajo';
+      const probabilidad = riesgo;
+      const impacto = riesgo;
 
-// Evento cuando se crea un dibujo
-map.on(L.Draw.Event.CREATED, e => {
-  drawnItems.clearLayers();
-  const layer = e.layer;
-  drawnItems.addLayer(layer);
+      const accion = {
+        Alto: 'Implementar vigilancia, capacitación y sanciones.',
+        Medio: 'Monitorear zonas y fomentar prevención.',
+        Bajo: 'Mantener vigilancia preventiva.'
+      };
 
-  const center = layer.getLatLng();
-  const radius = layer.getRadius();
-
-  // Filtrar incidentes dentro del círculo
-  const dentro = incidentFeatures.filter(f => {
-    const coords = f.geometry.coordinates; // [long, lat]
-    const latlng = L.latLng(coords[1], coords[0]);
-    return latlng.distanceTo(center) <= radius;
-  });
-
-  // Contar por tipo de incidente
-  const conteos = {};
-  dentro.forEach(f => {
-    const tipo = f.properties.incidente_c4 || "Desconocido";
-    conteos[tipo] = (conteos[tipo] || 0) + 1;
-  });
-
-  // Generar resumen y mostrarlo
-  const resumen = generarResumen(conteos);
-  mostrarResumen(resumen);
-});
-</script>
+      const tabla = `
+        <table class="risk-table">
+          <tr><th>Amenaza</th><th>Probabilidad</th><th>Impacto</th><th>Riesgo</th><th>Acción Preventiva</th></tr>
+          <tr><td>Incendios Urbanos</td><td>${probabilidad}</td><td>${impacto}</td><td>${riesgo}</td><td>${accion[riesgo]}</td></tr>
+        </table>
+      `;
+      document.getElementById('riskSummary').innerHTML = tabla;
+    }
+  </script>
 </body>
 </html>
