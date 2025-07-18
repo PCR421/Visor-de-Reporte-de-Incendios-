@@ -1,149 +1,194 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <title>Visor de Reporte de Incendios</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"/>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      margin: 0;
-      padding: 0;
-    }
-    #map {
-      height: 85vh;
-      width: 100%;
-    }
-    h1 {
-      text-align: center;
-      margin: 10px 0;
-    }
-    .info-box {
-      background-color: white;
-      padding: 10px;
-      max-height: 15vh;
-      overflow-y: auto;
-      font-size: 14px;
-      border-top: 1px solid #ccc;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Visor de Incendios Urbanos</title>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+<style>
+  body, html { margin:0; padding:0; height:100%; font-family: Arial, sans-serif; }
+  #map { height: 70vh; }
+  #controls { padding: 10px; }
+  #results { max-height: 25vh; overflow-y: auto; margin-top: 10px; border: 1px solid #ccc; padding: 5px; font-size: 14px; }
+  .legend { background: white; padding: 6px; line-height: 1.4em; }
+  .legend-color { display: inline-block; width: 15px; height: 15px; margin-right: 6px; vertical-align: middle; }
+</style>
 </head>
 <body>
-  <h1>Visor de Reporte de Incendios</h1>
-  <div id="map"></div>
-  <div class="info-box" id="infoBox">
-    Traza un radio sobre el mapa para ver el resumen de riesgo.
-  </div>
 
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+<h2 style="text-align:center; margin:10px;">Visor de Incendios Urbanos - Ciudad de México</h2>
 
-  <script>
-    const map = L.map('map').setView([19.4, -99.15], 11);
+<div id="map"></div>
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-    }).addTo(map);
+<div id="controls">
+  <button id="toggleRadiusBtn">Activar modo radio 500m</button>
+  <div id="results">Resultados aquí...</div>
+</div>
 
-    let incidentesLayer;
-    let puntos = [];
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- Load GeoJSON with fetch API -->
 
-    fetch('incendios_urbanos_2022.geojson')
-      .then(response => response.json())
-      .then(data => {
-        incidentesLayer = L.geoJSON(data, {
-          onEachFeature: function (feature, layer) {
-            const props = feature.properties;
-            layer.bindPopup(
-              `<strong>${props.incidente_c4}</strong><br>${props.colonia_cierre}<br>${props.alcaldia_cierre}`
-            );
-            puntos.push(layer);
-          },
-          pointToLayer: function (feature, latlng) {
-            return L.circleMarker(latlng, {
-              radius: 5,
-              color: '#e63946',
-              fillColor: '#f1a1a1',
-              fillOpacity: 0.7,
-              weight: 1
-            });
-          }
-        }).addTo(map);
-      });
+<script>
+  // Inicializar mapa
+  var map = L.map('map').setView([19.43, -99.13], 11);
 
-    const drawControl = new L.Control.Draw({
-      draw: {
-        polygon: false,
-        polyline: false,
-        rectangle: false,
-        marker: false,
-        circlemarker: false,
-        circle: {
-          shapeOptions: {
-            color: '#1d3557'
-          }
-        }
-      },
-      edit: false
-    });
-    map.addControl(drawControl);
+  // Capa base
+  var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(map);
 
-    map.on(L.Draw.Event.CREATED, function (e) {
-      const layer = e.layer;
-      const radius = layer.getRadius();
-      const center = layer.getLatLng();
-      const resultados = [];
+  // Variables
+  var geojsonUrl = 'Incendios Urbanos 2022.geojson'; // archivo en misma carpeta
+  var incendioLayer;
+  var radiusCircle;
+  var modoRadio = false;
+  var resultsDiv = document.getElementById('results');
+  var toggleBtn = document.getElementById('toggleRadiusBtn');
 
-      puntos.forEach(marker => {
-        const distance = center.distanceTo(marker.getLatLng());
-        if (distance <= radius) {
-          resultados.push(marker.feature.properties);
-        }
-      });
+  // Colores para clasificación (puedes ajustar)
+  var colores = {
+    'Quema de basura': '#FF5733',
+    'Casa habitacion': '#33C1FF',
+    'Vehiculo': '#33FF49',
+    'Arbol': '#B533FF',
+    'Industria': '#FFC733',
+    'Edificio': '#FF33A8',
+    'Negocio plaza comercial mercado': '#3385FF',
+    'Otros': '#888888'
+  };
 
-      map.eachLayer(function (layer) {
-        if (layer instanceof L.Circle) {
-          map.removeLayer(layer);
-        }
-      });
+  // Función para elegir color según incidente
+  function getColor(tipo) {
+    return colores[tipo] || colores['Otros'];
+  }
 
-      layer.addTo(map);
+  // Función para crear popup info
+  function onEachFeature(feature, layer) {
+    var props = feature.properties;
+    var html = '<b>Incidente:</b> ' + props.incidente_c4 + '<br>' +
+               '<b>Alcaldía:</b> ' + props.alcaldia_cierre + '<br>' +
+               '<b>Colonia:</b> ' + props.colonia_cierre;
+    layer.bindPopup(html);
+  }
 
-      mostrarResumen(resultados);
+  // Cargar GeoJSON y crear layer
+  fetch(geojsonUrl)
+    .then(response => response.json())
+    .then(data => {
+      incendioLayer = L.geoJSON(data, {
+        pointToLayer: function(feature, latlng) {
+          return L.circleMarker(latlng, {
+            radius: 6,
+            fillColor: getColor(feature.properties.incidente_c4),
+            color: '#000',
+            weight: 1,
+            fillOpacity: 0.8
+          });
+        },
+        onEachFeature: onEachFeature
+      }).addTo(map);
+
+      agregarLeyenda();
+    })
+    .catch(err => {
+      resultsDiv.innerHTML = "Error cargando datos: " + err;
     });
 
-    function mostrarResumen(data) {
-      if (data.length === 0) {
-        document.getElementById("infoBox").innerHTML = "No hay incidentes dentro del radio.";
-        return;
+  // Leyenda
+  function agregarLeyenda() {
+    var legend = L.control({position: 'bottomright'});
+    legend.onAdd = function (map) {
+      var div = L.DomUtil.create('div', 'legend');
+      div.innerHTML = '<b>Incidentes</b><br>';
+      for (var tipo in colores) {
+        div.innerHTML +=
+          '<span class="legend-color" style="background:' + colores[tipo] + '"></span>' +
+          tipo + '<br>';
       }
+      return div;
+    };
+    legend.addTo(map);
+  }
 
-      const total = data.length;
-      let riesgo = "Bajo";
-      if (total > 5 && total <= 15) riesgo = "Medio";
-      if (total > 15) riesgo = "Alto";
-
-      let resumen = `
-        <strong>Resumen dentro del radio:</strong><br>
-        Incidentes: ${total}<br>
-        Probabilidad: ${riesgo}<br>
-        Impacto: ${riesgo}<br>
-        <strong>Riesgo: ${riesgo}</strong><br><br>
-        Acciones recomendadas:
-      `;
-
-      if (riesgo === "Alto") {
-        resumen += "<ul><li>Vigilancia activa</li><li>Capacitación a brigadas</li><li>Campañas preventivas</li></ul>";
-      } else if (riesgo === "Medio") {
-        resumen += "<ul><li>Monitoreo periódico</li><li>Informar a la comunidad</li></ul>";
-      } else {
-        resumen += "<ul><li>Seguimiento general</li></ul>";
+  // Manejo del modo radio 500m
+  toggleBtn.onclick = function() {
+    modoRadio = !modoRadio;
+    if (modoRadio) {
+      this.textContent = "Modo radio activado: haz clic en el mapa";
+      resultsDiv.innerHTML = "Haz clic en el mapa para trazar un radio de 500 metros y filtrar incidentes.";
+      map.on('click', onMapClickRadio);
+    } else {
+      this.textContent = "Activar modo radio 500m";
+      resultsDiv.innerHTML = "Modo radio desactivado.";
+      map.off('click', onMapClickRadio);
+      if (radiusCircle) {
+        map.removeLayer(radiusCircle);
+        radiusCircle = null;
       }
-
-      document.getElementById("infoBox").innerHTML = resumen;
+      // Restaurar todos los puntos visibles
+      if (incendioLayer) incendioLayer.eachLayer(function(layer) {
+        layer.setStyle({opacity:1, fillOpacity:0.8});
+      });
     }
-  </script>
+  };
+
+  // Al hacer click en el mapa en modo radio
+  function onMapClickRadio(e) {
+    if (radiusCircle) map.removeLayer(radiusCircle);
+
+    radiusCircle = L.circle(e.latlng, {radius: 500, color: 'red', weight: 2, fillOpacity: 0.1}).addTo(map);
+
+    // Filtrar puntos dentro del radio
+    var puntosDentro = [];
+    incendioLayer.eachLayer(function(layer) {
+      var distancia = map.distance(e.latlng, layer.getLatLng());
+      if (distancia <= 500) {
+        layer.setStyle({opacity:1, fillOpacity:0.8});
+        puntosDentro.push(layer.feature.properties);
+      } else {
+        layer.setStyle({opacity:0.2, fillOpacity:0.1});
+      }
+    });
+
+    // Mostrar resultados en tabla simplificada
+    mostrarResultados(puntosDentro);
+  }
+
+  // Mostrar resultados en div
+  function mostrarResultados(puntos) {
+    if (puntos.length === 0) {
+      resultsDiv.innerHTML = "No se encontraron incidentes dentro del radio de 500m.";
+      return;
+    }
+    var html = '<b>Incidentes dentro de 500m: ' + puntos.length + '</b><br><table border="1" cellpadding="3" style="border-collapse: collapse; width: 100%;">';
+    html += '<tr><th>Incidente</th><th>Alcaldía</th><th>Colonia</th></tr>';
+    puntos.forEach(function(p) {
+      html += '<tr><td>' + p.incidente_c4 + '</td><td>' + p.alcaldia_cierre + '</td><td>' + p.colonia_cierre + '</td></tr>';
+    });
+    html += '</table>';
+
+    // Aquí puedes agregar el cálculo básico de probabilidad, impacto y riesgo según cantidad
+    // Por ejemplo:
+    var probabilidad = 'Bajo', impacto = 'Bajo', riesgo = 'Bajo';
+    if (puntos.length > 50) {
+      probabilidad = 'Alto';
+      impacto = 'Alto';
+      riesgo = 'Alto';
+    } else if (puntos.length > 20) {
+      probabilidad = 'Medio';
+      impacto = 'Medio';
+      riesgo = 'Medio';
+    }
+    html += `<br><b>Probabilidad:</b> ${probabilidad} | <b>Impacto:</b> ${impacto} | <b>Riesgo:</b> ${riesgo}`;
+
+    resultsDiv.innerHTML = html;
+  }
+</script>
+
 </body>
 </html>
