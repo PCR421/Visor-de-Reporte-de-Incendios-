@@ -28,7 +28,7 @@
   }
   #radioBtn {
     position: absolute;
-    top: 60px; /* bajo el título */
+    top: 100px; /* bajado para que no choque con controles de zoom */
     left: 10px;
     background: white;
     padding: 8px 14px;
@@ -47,24 +47,28 @@
     border-color: #b52b27;
   }
   .leaflet-control-layers {
-    margin-top: 110px !important; /* para que no se pise con el botón */
+    margin-top: 150px !important; /* para que no se pise con el botón */
     z-index: 1000;
   }
   #map { 
-    height: 60vh; 
+    height: calc(100vh - 50px); /* para que la tabla quede encima sin hacer scroll doble */
     width: 100%;
     position: relative;
     z-index: 0;
   }
   #tablaResultados {
-    margin: 10px 20px 30px;
-    overflow-x: auto;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
     max-height: 30vh;
+    overflow-y: auto;
     border-collapse: collapse;
-    width: calc(100% - 40px);
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    width: 100%;
+    box-shadow: 0 -3px 15px rgba(0,0,0,0.2);
     background: white;
     font-size: 0.9rem;
+    z-index: 1500;
   }
   #tablaResultados th, #tablaResultados td {
     border: 1px solid #ccc;
@@ -99,6 +103,19 @@
     height: 16px;
     border-radius: 3px;
   }
+  #clasificacion {
+    position: fixed;
+    bottom: 30vh;
+    left: 10px;
+    background: rgba(255,255,255,0.9);
+    padding: 6px 12px;
+    font-weight: 700;
+    font-size: 1rem;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.15);
+    z-index: 1600;
+    user-select: none;
+  }
 </style>
 </head>
 <body>
@@ -122,7 +139,7 @@
   <tbody></tbody>
 </table>
 
-<div id="clasificacion" style="margin:0 20px 30px; font-weight: 700; font-size: 1rem; display:none;"></div>
+<div id="clasificacion" style="display:none;"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
@@ -137,7 +154,6 @@
   let modoRadio = false;
   let radioCapa = null;
 
-  // Colores únicos para tipos de incidentes
   const coloresIncidentes = {
     "Quema de basura": "#e67e22",
     "Casa habitacion": "#2980b9",
@@ -149,17 +165,14 @@
     "Otro": "#7f8c8d"
   };
 
-  // Objetos para subcapas según tipo
   let subcapas = {};
 
-  // Referencias a elementos del DOM
   const tablaResultados = document.getElementById('tablaResultados');
   const tbodyResultados = tablaResultados.querySelector('tbody');
   const divClasificacion = document.getElementById('clasificacion');
   const radioBtn = document.getElementById('radioBtn');
   const leyendaDiv = document.getElementById('leyenda');
 
-  // Cargar GeoJSON y crear subcapas
   fetch('Incendios Urbanos 2022.geojson')
     .then(res => res.json())
     .then(data => {
@@ -172,14 +185,12 @@
         }
 
         let coords = feature.geometry.coordinates;
-        // Si es MultiPoint o Polygon o LineString hay que adaptarlo, pero asumo Point:
         let latlng;
         if(feature.geometry.type === "Point") {
           latlng = [coords[1], coords[0]];
         } else if(feature.geometry.type === "MultiPoint" && coords.length > 0) {
           latlng = [coords[0][1], coords[0][0]];
         } else {
-          // si no es punto, solo ignorar o tomar primer punto del primer conjunto:
           latlng = [coords[0][1], coords[0][0]];
         }
 
@@ -201,7 +212,6 @@
         subcapas[tipo].addLayer(marker);
       });
 
-      // Agregar todas las subcapas al mapa y al control de capas
       let capasControl = {};
       for (const tipo in subcapas) {
         subcapas[tipo].addTo(map);
@@ -210,7 +220,6 @@
 
       L.control.layers(null, capasControl, { collapsed: false }).addTo(map);
 
-      // Crear leyenda dinámica
       leyendaDiv.innerHTML = '';
       for (const tipo in coloresIncidentes) {
         const color = coloresIncidentes[tipo];
@@ -239,7 +248,6 @@
     tablaResultados.hidden = true;
   }
 
-  // Clasificación simple basada en cantidad de incidentes dentro del radio
   function clasificarRiesgo(cantidad) {
     if (cantidad > 50) return {prob: 'Alto', impacto: 'Alto', riesgo: 'Alto'};
     if (cantidad > 20) return {prob: 'Medio', impacto: 'Medio', riesgo: 'Medio'};
@@ -265,7 +273,6 @@
     let conteo = 0;
     let resultados = [];
 
-    // Para cada subcapa visible buscar puntos dentro del radio
     for (const tipo in subcapas) {
       if (map.hasLayer(subcapas[tipo])) {
         subcapas[tipo].eachLayer(function(layer) {
@@ -283,10 +290,8 @@
       }
     }
 
-    // Mostrar popup con conteo
     radioCapa.bindPopup(`Incidentes en el radio: <strong>${conteo}</strong>`).openPopup();
 
-    // Mostrar tabla
     tbodyResultados.innerHTML = '';
     if (resultados.length > 0) {
       resultados.forEach(r => {
@@ -299,7 +304,6 @@
       tablaResultados.hidden = true;
     }
 
-    // Mostrar clasificación
     const clasif = clasificarRiesgo(conteo);
     divClasificacion.style.display = 'block';
     divClasificacion.innerHTML = `
