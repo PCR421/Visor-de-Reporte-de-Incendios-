@@ -39,6 +39,7 @@
     z-index: 1000;
     user-select: none;
     box-shadow: 1px 1px 5px rgba(0,0,0,0.3);
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
   }
   #radioBtn.active {
     background: #d9534f;
@@ -69,6 +70,7 @@
     border: 1px solid #ccc;
     padding: 8px 12px;
     text-align: left;
+    vertical-align: middle;
   }
   #tablaResultados th {
     background-color: #003366;
@@ -105,9 +107,7 @@
 <div id="radioBtn" onclick="activarHerramientaRadio()">🎯 Activar Radio</div>
 <div id="map"></div>
 
-<div class="leyenda" id="leyenda">
-  <!-- Se rellenará con leyenda dinámica -->
-</div>
+<div class="leyenda" id="leyenda"></div>
 
 <table id="tablaResultados" hidden>
   <thead>
@@ -121,6 +121,8 @@
   </thead>
   <tbody></tbody>
 </table>
+
+<div id="clasificacion" style="margin:0 20px 30px; font-weight: 700; font-size: 1rem; display:none;"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
@@ -150,6 +152,13 @@
   // Objetos para subcapas según tipo
   let subcapas = {};
 
+  // Referencias a elementos del DOM
+  const tablaResultados = document.getElementById('tablaResultados');
+  const tbodyResultados = tablaResultados.querySelector('tbody');
+  const divClasificacion = document.getElementById('clasificacion');
+  const radioBtn = document.getElementById('radioBtn');
+  const leyendaDiv = document.getElementById('leyenda');
+
   // Cargar GeoJSON y crear subcapas
   fetch('Incendios Urbanos 2022.geojson')
     .then(res => res.json())
@@ -162,7 +171,17 @@
           subcapas[tipo] = L.layerGroup();
         }
 
-        let latlng = [feature.geometry.coordinates[0][1], feature.geometry.coordinates[0][0]];
+        let coords = feature.geometry.coordinates;
+        // Si es MultiPoint o Polygon o LineString hay que adaptarlo, pero asumo Point:
+        let latlng;
+        if(feature.geometry.type === "Point") {
+          latlng = [coords[1], coords[0]];
+        } else if(feature.geometry.type === "MultiPoint" && coords.length > 0) {
+          latlng = [coords[0][1], coords[0][0]];
+        } else {
+          // si no es punto, solo ignorar o tomar primer punto del primer conjunto:
+          latlng = [coords[0][1], coords[0][0]];
+        }
 
         let marker = L.circleMarker(latlng, {
           radius: 6,
@@ -192,7 +211,6 @@
       L.control.layers(null, capasControl, { collapsed: false }).addTo(map);
 
       // Crear leyenda dinámica
-      const leyendaDiv = document.getElementById('leyenda');
       leyendaDiv.innerHTML = '';
       for (const tipo in coloresIncidentes) {
         const color = coloresIncidentes[tipo];
@@ -206,7 +224,6 @@
 
   function activarHerramientaRadio() {
     modoRadio = !modoRadio;
-    const radioBtn = document.getElementById('radioBtn');
     radioBtn.classList.toggle('active');
     radioBtn.textContent = modoRadio ? '🛑 Cancelar Radio' : '🎯 Activar Radio';
     if (radioCapa) {
@@ -214,12 +231,20 @@
       radioCapa = null;
     }
     limpiarTabla();
+    divClasificacion.style.display = 'none';
   }
 
   function limpiarTabla() {
-    const tbody = document.querySelector('#tablaResultados tbody');
-    tbody.innerHTML = '';
-    document.getElementById('tablaResultados').hidden = true;
+    tbodyResultados.innerHTML = '';
+    tablaResultados.hidden = true;
+  }
+
+  // Clasificación simple basada en cantidad de incidentes dentro del radio
+  function clasificarRiesgo(cantidad) {
+    if (cantidad > 50) return {prob: 'Alto', impacto: 'Alto', riesgo: 'Alto'};
+    if (cantidad > 20) return {prob: 'Medio', impacto: 'Medio', riesgo: 'Medio'};
+    if (cantidad > 0)  return {prob: 'Bajo', impacto: 'Bajo', riesgo: 'Bajo'};
+    return {prob: '-', impacto: '-', riesgo: '-'};
   }
 
   map.on('click', function(e) {
@@ -240,7 +265,7 @@
     let conteo = 0;
     let resultados = [];
 
-    // Para cada subcapa que esté visible, buscar puntos dentro del radio
+    // Para cada subcapa visible buscar puntos dentro del radio
     for (const tipo in subcapas) {
       if (map.hasLayer(subcapas[tipo])) {
         subcapas[tipo].eachLayer(function(layer) {
@@ -258,22 +283,30 @@
       }
     }
 
-    // Mostrar conteo en popup
+    // Mostrar popup con conteo
     radioCapa.bindPopup(`Incidentes en el radio: <strong>${conteo}</strong>`).openPopup();
 
-    // Actualizar tabla con resultados
-    const tbody = document.querySelector('#tablaResultados tbody');
-    tbody.innerHTML = '';
+    // Mostrar tabla
+    tbodyResultados.innerHTML = '';
     if (resultados.length > 0) {
       resultados.forEach(r => {
         let tr = document.createElement('tr');
         tr.innerHTML = `<td>${r.incidente}</td><td>${r.alcaldia}</td><td>${r.colonia}</td><td>${r.latitud}</td><td>${r.longitud}</td>`;
-        tbody.appendChild(tr);
+        tbodyResultados.appendChild(tr);
       });
-      document.getElementById('tablaResultados').hidden = false;
+      tablaResultados.hidden = false;
     } else {
-      document.getElementById('tablaResultados').hidden = true;
+      tablaResultados.hidden = true;
     }
+
+    // Mostrar clasificación
+    const clasif = clasificarRiesgo(conteo);
+    divClasificacion.style.display = 'block';
+    divClasificacion.innerHTML = `
+      <strong>Probabilidad:</strong> ${clasif.prob} | 
+      <strong>Impacto:</strong> ${clasif.impacto} | 
+      <strong>Riesgo:</strong> ${clasif.riesgo}
+    `;
   });
 </script>
 
