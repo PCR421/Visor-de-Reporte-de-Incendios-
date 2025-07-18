@@ -1,105 +1,112 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Visor de Incendios Urbanos CDMX</title>
-
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
-
-  <style>
-    body, html {
-      margin: 0;
-      height: 100%;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      display: flex;
-      flex-direction: column;
-    }
-    #titulo {
-      padding: 10px 20px;
-      background: #003366;
-      color: white;
-      font-size: 1.5rem;
-      font-weight: 700;
-    }
-    #radioBtn {
-      position: absolute;
-      top: 160px; /* bajado 100px más */
-      left: 10px;
-      background: white;
-      padding: 8px 14px;
-      cursor: pointer;
-      border: 2px solid #666;
-      border-radius: 5px;
-      font-weight: bold;
-      z-index: 1000;
-      user-select: none;
-      box-shadow: 1px 1px 5px rgba(0,0,0,0.3);
-    }
-    #radioBtn.active {
-      background: #d9534f;
-      color: white;
-      border-color: #b52b27;
-    }
-    .leaflet-control-layers {
-      margin-top: 210px !important;
-    }
-    #map {
-      height: 65vh;
-      width: 100%;
-    }
-    #tablaResultados {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: white;
-      max-height: 30vh;
-      overflow-y: auto;
-      margin: 0;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-      box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
-      z-index: 999;
-    }
-    #tablaResultados th, #tablaResultados td {
-      border: 1px solid #ccc;
-      padding: 6px 10px;
-      text-align: left;
-    }
-    #tablaResultados th {
-      background-color: #003366;
-      color: white;
-      position: sticky;
-      top: 0;
-      z-index: 1;
-    }
-    .leyenda {
-      display: flex;
-      flex-wrap: wrap;
-      margin: 10px 20px;
-      gap: 15px;
-    }
-    .item-leyenda {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 600;
-      font-size: 0.9rem;
-    }
-    .color-box {
-      width: 16px;
-      height: 16px;
-      border-radius: 3px;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Visor de Incendios Urbanos CDMX</title>
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  crossorigin=""
+/>
+<style>
+  body, html {
+    margin: 0; 
+    height: 100%;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+  }
+  #titulo {
+    padding: 10px 20px;
+    background: #003366;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+    user-select: none;
+  }
+  #radioBtn {
+    position: absolute;
+    top: 60px; /* bajo el título */
+    left: 10px;
+    background: white;
+    padding: 8px 14px;
+    cursor: pointer;
+    border: 2px solid #666;
+    border-radius: 5px;
+    font-weight: bold;
+    z-index: 1000;
+    user-select: none;
+    box-shadow: 1px 1px 5px rgba(0,0,0,0.3);
+    transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+  }
+  #radioBtn.active {
+    background: #d9534f;
+    color: white;
+    border-color: #b52b27;
+  }
+  .leaflet-control-layers {
+    margin-top: 110px !important; /* para que no se pise con el botón */
+    z-index: 1000;
+  }
+  #map { 
+    height: 60vh; 
+    width: 100%;
+    position: relative;
+    z-index: 0;
+  }
+  #tablaResultados {
+    margin: 10px 20px 30px;
+    overflow-x: auto;
+    max-height: 30vh;
+    border-collapse: collapse;
+    width: calc(100% - 40px);
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    background: white;
+    font-size: 0.9rem;
+  }
+  #tablaResultados th, #tablaResultados td {
+    border: 1px solid #ccc;
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: middle;
+  }
+  #tablaResultados th {
+    background-color: #003366;
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  /* Colores para leyenda y círculos */
+  .leyenda {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 10px 20px;
+    gap: 15px;
+    user-select: none;
+  }
+  .item-leyenda {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .color-box {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+  }
+</style>
 </head>
 <body>
 
 <div id="titulo">Visor de Incendios Urbanos CDMX</div>
 <div id="radioBtn" onclick="activarHerramientaRadio()">🎯 Activar Radio</div>
 <div id="map"></div>
+
 <div class="leyenda" id="leyenda"></div>
 
 <table id="tablaResultados" hidden>
@@ -115,10 +122,9 @@
   <tbody></tbody>
 </table>
 
-<!-- Leaflet -->
+<div id="clasificacion" style="margin:0 20px 30px; font-weight: 700; font-size: 1rem; display:none;"></div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-<!-- Buscador -->
-<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
 <script>
   const map = L.map('map').setView([19.4, -99.14], 11);
@@ -128,11 +134,10 @@
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // Buscador
-  L.Control.geocoder().addTo(map);
-
   let modoRadio = false;
   let radioCapa = null;
+
+  // Colores únicos para tipos de incidentes
   const coloresIncidentes = {
     "Quema de basura": "#e67e22",
     "Casa habitacion": "#2980b9",
@@ -143,26 +148,51 @@
     "Negocio plaza comercial mercado": "#d35400",
     "Otro": "#7f8c8d"
   };
+
+  // Objetos para subcapas según tipo
   let subcapas = {};
 
+  // Referencias a elementos del DOM
+  const tablaResultados = document.getElementById('tablaResultados');
+  const tbodyResultados = tablaResultados.querySelector('tbody');
+  const divClasificacion = document.getElementById('clasificacion');
+  const radioBtn = document.getElementById('radioBtn');
+  const leyendaDiv = document.getElementById('leyenda');
+
+  // Cargar GeoJSON y crear subcapas
   fetch('Incendios Urbanos 2022.geojson')
     .then(res => res.json())
     .then(data => {
       data.features.forEach(feature => {
         let tipo = feature.properties.incidente_c4 || "Otro";
         if (!coloresIncidentes[tipo]) tipo = "Otro";
-        if (!subcapas[tipo]) subcapas[tipo] = L.layerGroup();
 
-        const coords = feature.geometry.coordinates;
-        const latlng = [coords[1], coords[0]];
+        if (!subcapas[tipo]) {
+          subcapas[tipo] = L.layerGroup();
+        }
 
-        const marker = L.circleMarker(latlng, {
+        let coords = feature.geometry.coordinates;
+        // Si es MultiPoint o Polygon o LineString hay que adaptarlo, pero asumo Point:
+        let latlng;
+        if(feature.geometry.type === "Point") {
+          latlng = [coords[1], coords[0]];
+        } else if(feature.geometry.type === "MultiPoint" && coords.length > 0) {
+          latlng = [coords[0][1], coords[0][0]];
+        } else {
+          // si no es punto, solo ignorar o tomar primer punto del primer conjunto:
+          latlng = [coords[0][1], coords[0][0]];
+        }
+
+        let marker = L.circleMarker(latlng, {
           radius: 6,
           fillColor: coloresIncidentes[tipo],
           color: '#000',
           weight: 1,
+          opacity: 1,
           fillOpacity: 0.8
-        }).bindPopup(
+        });
+
+        marker.bindPopup(
           `<b>Incidente:</b> ${feature.properties.incidente_c4}<br>` +
           `<b>Alcaldía:</b> ${feature.properties.alcaldia_cierre}<br>` +
           `<b>Colonia:</b> ${feature.properties.colonia_cierre}`
@@ -171,7 +201,8 @@
         subcapas[tipo].addLayer(marker);
       });
 
-      const capasControl = {};
+      // Agregar todas las subcapas al mapa y al control de capas
+      let capasControl = {};
       for (const tipo in subcapas) {
         subcapas[tipo].addTo(map);
         capasControl[tipo] = subcapas[tipo];
@@ -179,7 +210,8 @@
 
       L.control.layers(null, capasControl, { collapsed: false }).addTo(map);
 
-      const leyendaDiv = document.getElementById('leyenda');
+      // Crear leyenda dinámica
+      leyendaDiv.innerHTML = '';
       for (const tipo in coloresIncidentes) {
         const color = coloresIncidentes[tipo];
         const div = document.createElement('div');
@@ -187,28 +219,37 @@
         div.innerHTML = `<div class="color-box" style="background:${color}"></div>${tipo}`;
         leyendaDiv.appendChild(div);
       }
-    });
+    })
+    .catch(err => alert('Error cargando GeoJSON: ' + err));
 
   function activarHerramientaRadio() {
     modoRadio = !modoRadio;
-    const btn = document.getElementById('radioBtn');
-    btn.classList.toggle('active');
-    btn.textContent = modoRadio ? '🛑 Cancelar Radio' : '🎯 Activar Radio';
+    radioBtn.classList.toggle('active');
+    radioBtn.textContent = modoRadio ? '🛑 Cancelar Radio' : '🎯 Activar Radio';
     if (radioCapa) {
       map.removeLayer(radioCapa);
       radioCapa = null;
     }
     limpiarTabla();
+    divClasificacion.style.display = 'none';
   }
 
   function limpiarTabla() {
-    const tbody = document.querySelector('#tablaResultados tbody');
-    tbody.innerHTML = '';
-    document.getElementById('tablaResultados').hidden = true;
+    tbodyResultados.innerHTML = '';
+    tablaResultados.hidden = true;
+  }
+
+  // Clasificación simple basada en cantidad de incidentes dentro del radio
+  function clasificarRiesgo(cantidad) {
+    if (cantidad > 50) return {prob: 'Alto', impacto: 'Alto', riesgo: 'Alto'};
+    if (cantidad > 20) return {prob: 'Medio', impacto: 'Medio', riesgo: 'Medio'};
+    if (cantidad > 0)  return {prob: 'Bajo', impacto: 'Bajo', riesgo: 'Bajo'};
+    return {prob: '-', impacto: '-', riesgo: '-'};
   }
 
   map.on('click', function(e) {
     if (!modoRadio) return;
+
     if (radioCapa) {
       map.removeLayer(radioCapa);
       radioCapa = null;
@@ -221,12 +262,15 @@
       fillOpacity: 0.2
     }).addTo(map);
 
+    let conteo = 0;
     let resultados = [];
 
+    // Para cada subcapa visible buscar puntos dentro del radio
     for (const tipo in subcapas) {
       if (map.hasLayer(subcapas[tipo])) {
         subcapas[tipo].eachLayer(function(layer) {
           if (layer.getLatLng && e.latlng.distanceTo(layer.getLatLng()) <= 500) {
+            conteo++;
             resultados.push({
               incidente: tipo,
               alcaldia: layer.getPopup().getContent().match(/<b>Alcaldía:<\/b> ([^<]+)/)[1],
@@ -239,20 +283,30 @@
       }
     }
 
-    const tbody = document.querySelector('#tablaResultados tbody');
-    tbody.innerHTML = '';
+    // Mostrar popup con conteo
+    radioCapa.bindPopup(`Incidentes en el radio: <strong>${conteo}</strong>`).openPopup();
+
+    // Mostrar tabla
+    tbodyResultados.innerHTML = '';
     if (resultados.length > 0) {
       resultados.forEach(r => {
         let tr = document.createElement('tr');
         tr.innerHTML = `<td>${r.incidente}</td><td>${r.alcaldia}</td><td>${r.colonia}</td><td>${r.latitud}</td><td>${r.longitud}</td>`;
-        tbody.appendChild(tr);
+        tbodyResultados.appendChild(tr);
       });
-      document.getElementById('tablaResultados').hidden = false;
+      tablaResultados.hidden = false;
     } else {
-      document.getElementById('tablaResultados').hidden = true;
+      tablaResultados.hidden = true;
     }
 
-    radioCapa.bindPopup(`Incidentes en el radio: <strong>${resultados.length}</strong>`).openPopup();
+    // Mostrar clasificación
+    const clasif = clasificarRiesgo(conteo);
+    divClasificacion.style.display = 'block';
+    divClasificacion.innerHTML = `
+      <strong>Probabilidad:</strong> ${clasif.prob} | 
+      <strong>Impacto:</strong> ${clasif.impacto} | 
+      <strong>Riesgo:</strong> ${clasif.riesgo}
+    `;
   });
 </script>
 
