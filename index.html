@@ -12,12 +12,9 @@
   body, html { margin:0; padding:0; height:100%; font-family: Arial, sans-serif; }
   #map { height: 70vh; }
   #controls { padding: 10px; }
-  #results { max-height: 25vh; overflow-y: auto; margin-top: 10px; border: 1px solid #ccc; padding: 5px; font-size: 14px; }
+  #results { max-height: 25vh; overflow-y: auto; margin-top: 10px; border: 1px solid #ccc; padding: 5px; font-size: 14px; background: #fff; color: #000; }
   .legend { background: white; padding: 6px; line-height: 1.4em; }
   .legend-color { display: inline-block; width: 15px; height: 15px; margin-right: 6px; vertical-align: middle; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { border: 1px solid #999; padding: 4px; text-align: left; font-size: 13px; }
-  th { background-color: #eee; }
 </style>
 </head>
 <body>
@@ -35,24 +32,16 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-  // --- Inicialización del mapa ---
+  // Inicializar mapa
   var map = L.map('map').setView([19.43, -99.13], 11);
 
-  // Capa base OpenStreetMap
+  // Capa base
   var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // --- Variables globales ---
-  var geojsonUrl = 'Incendios Urbanos 2022.geojson'; // Debe estar en la misma carpeta
-  var incendioLayer;       // Layer con puntos
-  var radiusCircle;        // Círculo del radio
-  var modoRadio = false;   // Estado modo radio activo o no
-  var resultsDiv = document.getElementById('results');
-  var toggleBtn = document.getElementById('toggleRadiusBtn');
-
-  // Colores por tipo de incidente
+  // Colores para clasificación (ajusta según tus tipos)
   var colores = {
     'Quema de basura': '#FF5733',
     'Casa habitacion': '#33C1FF',
@@ -64,23 +53,20 @@
     'Otros': '#888888'
   };
 
-  // Función para obtener color según tipo
   function getColor(tipo) {
     return colores[tipo] || colores['Otros'];
   }
 
-  // Función para mostrar info en popup
-  function onEachFeature(feature, layer) {
-    var p = feature.properties;
-    var html = `<b>Incidente:</b> ${p.incidente_c4}<br>
-                <b>Alcaldía:</b> ${p.alcaldia_cierre}<br>
-                <b>Colonia:</b> ${p.colonia_cierre}`;
-    layer.bindPopup(html);
-  }
+  // Variables globales
+  var incendioLayer;
+  var modoRadio = false;
+  var radiusCircle;
+  var toggleBtn = document.getElementById('toggleRadiusBtn');
+  var resultsDiv = document.getElementById('results');
 
-  // --- Cargar GeoJSON y crear layer ---
-  fetch(geojsonUrl)
-    .then(response => response.json())
+  // Cargar GeoJSON
+  fetch('Incendios Urbanos 2022.geojson')
+    .then(res => res.json())
     .then(data => {
       incendioLayer = L.geoJSON(data, {
         pointToLayer: function(feature, latlng) {
@@ -92,31 +78,47 @@
             fillOpacity: 0.8
           });
         },
-        onEachFeature: onEachFeature
+        onEachFeature: function(feature, layer) {
+          layer.bindPopup(
+            '<b>Incidente:</b> ' + feature.properties.incidente_c4 + '<br>' +
+            '<b>Alcaldía:</b> ' + feature.properties.alcaldia_cierre + '<br>' +
+            '<b>Colonia:</b> ' + feature.properties.colonia_cierre
+          );
+        }
       }).addTo(map);
 
       agregarLeyenda();
+      agregarControlCapas();
     })
     .catch(err => {
-      resultsDiv.innerHTML = "Error cargando datos: " + err;
+      resultsDiv.innerHTML = 'Error al cargar datos: ' + err;
     });
 
-  // --- Leyenda ---
+  // Leyenda
   function agregarLeyenda() {
     var legend = L.control({position: 'bottomright'});
-    legend.onAdd = function (map) {
+    legend.onAdd = function(map) {
       var div = L.DomUtil.create('div', 'legend');
       div.innerHTML = '<b>Incidentes</b><br>';
       for (var tipo in colores) {
         div.innerHTML +=
-          `<span class="legend-color" style="background:${colores[tipo]}"></span>${tipo}<br>`;
+          '<span class="legend-color" style="background:' + colores[tipo] + '"></span>' +
+          tipo + '<br>';
       }
       return div;
     };
     legend.addTo(map);
   }
 
-  // --- Botón modo radio ---
+  // Control para encender/apagar capa
+  function agregarControlCapas() {
+    var overlays = {
+      "Incendios": incendioLayer
+    };
+    L.control.layers(null, overlays).addTo(map);
+  }
+
+  // Botón modo radio
   toggleBtn.onclick = function() {
     modoRadio = !modoRadio;
     if (modoRadio) {
@@ -131,18 +133,24 @@
         map.removeLayer(radiusCircle);
         radiusCircle = null;
       }
-      // Restaurar visibilidad total
-      if (incendioLayer) incendioLayer.eachLayer(function(layer) {
+      // Restaurar estilo original a todos los puntos
+      incendioLayer.eachLayer(function(layer) {
         layer.setStyle({opacity:1, fillOpacity:0.8});
       });
     }
   };
 
-  // --- Función al hacer clic en mapa con modo radio activado ---
+  // Al hacer clic en el mapa en modo radio
   function onMapClickRadio(e) {
-    if (radiusCircle) map.removeLayer(radiusCircle);
-
-    radiusCircle = L.circle(e.latlng, {radius: 500, color: 'red', weight: 2, fillOpacity: 0.1}).addTo(map);
+    if (radiusCircle) {
+      map.removeLayer(radiusCircle);
+    }
+    radiusCircle = L.circle(e.latlng, {
+      radius: 500,
+      color: 'red',
+      weight: 2,
+      fillOpacity: 0.1
+    }).addTo(map);
 
     var puntosDentro = [];
     incendioLayer.eachLayer(function(layer) {
@@ -158,25 +166,21 @@
     mostrarResultados(puntosDentro);
   }
 
-  // --- Mostrar tabla y cálculo de riesgo ---
+  // Mostrar tabla y clasificaciones básicas
   function mostrarResultados(puntos) {
     if (puntos.length === 0) {
       resultsDiv.innerHTML = "No se encontraron incidentes dentro del radio de 500m.";
       return;
     }
 
-    // Tabla con atributos
-    var html = `<b>Incidentes dentro de 500m: ${puntos.length}</b><br>
-                <table>
-                <tr><th>Incidente</th><th>Alcaldía</th><th>Colonia</th></tr>`;
-
+    var html = '<b>Incidentes dentro de 500m: ' + puntos.length + '</b><br><table border="1" cellpadding="3" style="border-collapse: collapse; width: 100%;">';
+    html += '<tr><th>Incidente</th><th>Alcaldía</th><th>Colonia</th></tr>';
     puntos.forEach(function(p) {
-      html += `<tr><td>${p.incidente_c4}</td><td>${p.alcaldia_cierre}</td><td>${p.colonia_cierre}</td></tr>`;
+      html += '<tr><td>' + p.incidente_c4 + '</td><td>' + p.alcaldia_cierre + '</td><td>' + p.colonia_cierre + '</td></tr>';
     });
-
     html += '</table>';
 
-    // Clasificación simple de probabilidad, impacto y riesgo según cantidad
+    // Clasificación simple por número de puntos
     var probabilidad = 'Bajo', impacto = 'Bajo', riesgo = 'Bajo';
     if (puntos.length > 50) {
       probabilidad = 'Alto';
