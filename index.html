@@ -1,146 +1,148 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
   <title>Visor de Reporte de Incendios</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link 
-    rel="stylesheet" 
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
-    integrity="sha256-sA+e2E4vFop2jzvWyZzgmVjsICaU9QnE1hzpJzD/+yM=" 
-    crossorigin=""
-  />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"/>
   <style>
-    body { margin: 0; font-family: Arial, sans-serif; }
-    #map { height: 100vh; }
-    .controls {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 1000;
-      background: white;
-      padding: 10px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
     }
-    .risk-table {
-      margin-top: 10px;
-      border-collapse: collapse;
+    #map {
+      height: 85vh;
       width: 100%;
     }
-    .risk-table th, .risk-table td {
-      border: 1px solid #ccc;
-      padding: 4px;
-      font-size: 12px;
-      text-align: center;
-    }
     h1 {
-      font-size: 20px;
-      margin-bottom: 10px;
+      text-align: center;
+      margin: 10px 0;
     }
-    select, button {
-      margin-top: 5px;
-      font-size: 12px;
+    .info-box {
+      background-color: white;
+      padding: 10px;
+      max-height: 15vh;
+      overflow-y: auto;
+      font-size: 14px;
+      border-top: 1px solid #ccc;
     }
   </style>
 </head>
 <body>
-  <div class="controls">
-    <h1>Visor de Reporte de Incendios</h1>
-    <label>Filtrar por tipo de incidente:</label><br>
-    <select id="incidentFilter">
-      <option value="">Todos</option>
-    </select>
-    <br>
-    <button id="drawCircle">Trazar Radio (500m)</button>
-    <div id="riskSummary"></div>
+  <h1>Visor de Reporte de Incendios</h1>
+  <div id="map"></div>
+  <div class="info-box" id="infoBox">
+    Traza un radio sobre el mapa para ver el resumen de riesgo.
   </div>
 
-  <div id="map"></div>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     const map = L.map('map').setView([19.4, -99.15], 11);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
     }).addTo(map);
 
-    let geojsonLayer;
-    let allFeatures = [];
+    let incidentesLayer;
+    let puntos = [];
 
-    fetch("Incendios Urbanos 2022.geojson")
+    fetch('incendios_urbanos_2022.geojson')
       .then(response => response.json())
       .then(data => {
-        allFeatures = data.features;
-
-        populateFilterOptions(allFeatures);
-        geojsonLayer = L.geoJSON(allFeatures, {
-          pointToLayer: (feature, latlng) => {
-            return L.circleMarker(latlng, { radius: 6, color: "#e03e3e" })
-              .bindPopup(`<strong>Incidente:</strong> ${feature.properties.incidente_c4}<br>
-                          <strong>Alcaldía:</strong> ${feature.properties.alcaldia_cierre}<br>
-                          <strong>Colonia:</strong> ${feature.properties.colonia_cierre}`);
+        incidentesLayer = L.geoJSON(data, {
+          onEachFeature: function (feature, layer) {
+            const props = feature.properties;
+            layer.bindPopup(
+              `<strong>${props.incidente_c4}</strong><br>${props.colonia_cierre}<br>${props.alcaldia_cierre}`
+            );
+            puntos.push(layer);
+          },
+          pointToLayer: function (feature, latlng) {
+            return L.circleMarker(latlng, {
+              radius: 5,
+              color: '#e63946',
+              fillColor: '#f1a1a1',
+              fillOpacity: 0.7,
+              weight: 1
+            });
           }
         }).addTo(map);
       });
 
-    function populateFilterOptions(features) {
-      const select = document.getElementById('incidentFilter');
-      const types = [...new Set(features.map(f => f.properties.incidente_c4))].sort();
-      types.forEach(type => {
-        const opt = document.createElement('option');
-        opt.value = type;
-        opt.text = type;
-        select.appendChild(opt);
-      });
-      select.addEventListener('change', () => {
-        const selected = select.value;
-        const filtered = selected ? allFeatures.filter(f => f.properties.incidente_c4 === selected) : allFeatures;
-        if (geojsonLayer) map.removeLayer(geojsonLayer);
-        geojsonLayer = L.geoJSON(filtered, {
-          pointToLayer: (feature, latlng) => {
-            return L.circleMarker(latlng, { radius: 6, color: "#e03e3e" })
-              .bindPopup(`<strong>Incidente:</strong> ${feature.properties.incidente_c4}<br>
-                          <strong>Alcaldía:</strong> ${feature.properties.alcaldia_cierre}<br>
-                          <strong>Colonia:</strong> ${feature.properties.colonia_cierre}`);
+    const drawControl = new L.Control.Draw({
+      draw: {
+        polygon: false,
+        polyline: false,
+        rectangle: false,
+        marker: false,
+        circlemarker: false,
+        circle: {
+          shapeOptions: {
+            color: '#1d3557'
           }
-        }).addTo(map);
-      });
-    }
+        }
+      },
+      edit: false
+    });
+    map.addControl(drawControl);
 
-    let drawnCircle;
-    document.getElementById("drawCircle").addEventListener("click", () => {
-      map.once("click", function(e) {
-        if (drawnCircle) map.removeLayer(drawnCircle);
-        drawnCircle = L.circle(e.latlng, { radius: 500, color: "blue", fillOpacity: 0.1 }).addTo(map);
-        const featuresInRadius = allFeatures.filter(f => {
-          const lat = f.geometry.coordinates[0][1];
-          const lng = f.geometry.coordinates[0][0];
-          return map.distance(e.latlng, L.latLng(lat, lng)) <= 500;
-        });
-        showRiskSummary(featuresInRadius);
+    map.on(L.Draw.Event.CREATED, function (e) {
+      const layer = e.layer;
+      const radius = layer.getRadius();
+      const center = layer.getLatLng();
+      const resultados = [];
+
+      puntos.forEach(marker => {
+        const distance = center.distanceTo(marker.getLatLng());
+        if (distance <= radius) {
+          resultados.push(marker.feature.properties);
+        }
       });
+
+      map.eachLayer(function (layer) {
+        if (layer instanceof L.Circle) {
+          map.removeLayer(layer);
+        }
+      });
+
+      layer.addTo(map);
+
+      mostrarResumen(resultados);
     });
 
-    function showRiskSummary(features) {
-      const total = features.length;
-      const riesgo = total >= 10 ? 'Alto' : total >= 5 ? 'Medio' : 'Bajo';
-      const probabilidad = riesgo;
-      const impacto = riesgo;
+    function mostrarResumen(data) {
+      if (data.length === 0) {
+        document.getElementById("infoBox").innerHTML = "No hay incidentes dentro del radio.";
+        return;
+      }
 
-      const accion = {
-        Alto: 'Implementar vigilancia, capacitación y sanciones.',
-        Medio: 'Monitorear zonas y fomentar prevención.',
-        Bajo: 'Mantener vigilancia preventiva.'
-      };
+      const total = data.length;
+      let riesgo = "Bajo";
+      if (total > 5 && total <= 15) riesgo = "Medio";
+      if (total > 15) riesgo = "Alto";
 
-      const tabla = `
-        <table class="risk-table">
-          <tr><th>Amenaza</th><th>Probabilidad</th><th>Impacto</th><th>Riesgo</th><th>Acción Preventiva</th></tr>
-          <tr><td>Incendios Urbanos</td><td>${probabilidad}</td><td>${impacto}</td><td>${riesgo}</td><td>${accion[riesgo]}</td></tr>
-        </table>
+      let resumen = `
+        <strong>Resumen dentro del radio:</strong><br>
+        Incidentes: ${total}<br>
+        Probabilidad: ${riesgo}<br>
+        Impacto: ${riesgo}<br>
+        <strong>Riesgo: ${riesgo}</strong><br><br>
+        Acciones recomendadas:
       `;
-      document.getElementById('riskSummary').innerHTML = tabla;
+
+      if (riesgo === "Alto") {
+        resumen += "<ul><li>Vigilancia activa</li><li>Capacitación a brigadas</li><li>Campañas preventivas</li></ul>";
+      } else if (riesgo === "Medio") {
+        resumen += "<ul><li>Monitoreo periódico</li><li>Informar a la comunidad</li></ul>";
+      } else {
+        resumen += "<ul><li>Seguimiento general</li></ul>";
+      }
+
+      document.getElementById("infoBox").innerHTML = resumen;
     }
   </script>
 </body>
