@@ -1,143 +1,123 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Visor de Incendios Urbanos CDMX</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Visor de Incendios Urbanos CDMX</title>
 
-<!-- Leaflet CSS -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-  crossorigin=""
-/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
 
-<!-- Leaflet Control Geocoder CSS -->
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"
-/>
-
-<!-- DataTables CSS -->
-<link
-  rel="stylesheet"
-  href="https://cdn.datatables.net/1.13.4/css/jquery.dataTables.min.css"
-/>
-
-<style>
-  body, html {
-    margin: 0; 
-    height: 100%;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f8f9fa;
-    display: flex;
-    flex-direction: column;
-  }
-  #titulo {
-    padding: 10px 20px;
-    background: #003366;
-    color: white;
-    font-size: 1.5rem;
-    font-weight: 700;
-    user-select: none;
-  }
-  #radioBtn {
-    position: absolute;
-    top: 160px; /* botón abajo */
-    left: 10px;
-    background: white;
-    padding: 8px 14px;
-    cursor: pointer;
-    border: 2px solid #666;
-    border-radius: 5px;
-    font-weight: bold;
-    z-index: 1000;
-    user-select: none;
-    box-shadow: 1px 1px 5px rgba(0,0,0,0.3);
-  }
-  #radioBtn.active {
-    background: #d9534f;
-    color: white;
-    border-color: #b52b27;
-  }
-  .leaflet-control-layers {
-    margin-top: 110px !important;
-    z-index: 1000;
-  }
-  #map { 
-    height: 60vh; 
-    width: 100%;
-    position: relative;
-    z-index: 0;
-  }
-  #tablaContenedor {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    max-height: 35vh;
-    background: white;
-    z-index: 1500;
-    padding: 10px 20px;
-    box-shadow: 0 -3px 15px rgba(0,0,0,0.2);
-    overflow: auto;
-  }
-  /* Ancho completo para la tabla DataTables */
-  #tablaResultados {
-    width: 100% !important;
-  }
-
-  /* Leyenda */
-  .leyenda {
-    display: flex;
-    flex-wrap: wrap;
-    margin: 10px 20px;
-    gap: 15px;
-    user-select: none;
-  }
-  .item-leyenda {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-weight: 600;
-    font-size: 0.9rem;
-  }
-  .color-box {
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
-  }
-</style>
+  <style>
+    body, html {
+      margin: 0;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+    }
+    #titulo {
+      padding: 10px 20px;
+      background: #003366;
+      color: white;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+    #radioBtn {
+      position: absolute;
+      top: 160px; /* bajado 100px más */
+      left: 10px;
+      background: white;
+      padding: 8px 14px;
+      cursor: pointer;
+      border: 2px solid #666;
+      border-radius: 5px;
+      font-weight: bold;
+      z-index: 1000;
+      user-select: none;
+      box-shadow: 1px 1px 5px rgba(0,0,0,0.3);
+    }
+    #radioBtn.active {
+      background: #d9534f;
+      color: white;
+      border-color: #b52b27;
+    }
+    .leaflet-control-layers {
+      margin-top: 210px !important;
+    }
+    #map {
+      height: 65vh;
+      width: 100%;
+    }
+    #tablaResultados {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      max-height: 30vh;
+      overflow-y: auto;
+      margin: 0;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+      z-index: 999;
+    }
+    #tablaResultados th, #tablaResultados td {
+      border: 1px solid #ccc;
+      padding: 6px 10px;
+      text-align: left;
+    }
+    #tablaResultados th {
+      background-color: #003366;
+      color: white;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .leyenda {
+      display: flex;
+      flex-wrap: wrap;
+      margin: 10px 20px;
+      gap: 15px;
+    }
+    .item-leyenda {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .color-box {
+      width: 16px;
+      height: 16px;
+      border-radius: 3px;
+    }
+  </style>
 </head>
 <body>
 
 <div id="titulo">Visor de Incendios Urbanos CDMX</div>
 <div id="radioBtn" onclick="activarHerramientaRadio()">🎯 Activar Radio</div>
 <div id="map"></div>
+<div class="leyenda" id="leyenda"></div>
 
-<div class="leyenda" id="leyenda">
-  <!-- Leyenda se rellena aquí -->
-</div>
+<table id="tablaResultados" hidden>
+  <thead>
+    <tr>
+      <th>Incidente</th>
+      <th>Alcaldía</th>
+      <th>Colonia</th>
+      <th>Latitud</th>
+      <th>Longitud</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
 
-<div id="tablaContenedor" hidden>
-  <table id="tablaResultados" class="display">
-    <thead>
-      <tr>
-        <th>Incidente</th>
-        <th>Alcaldía</th>
-        <th>Colonia</th>
-        <th>Latitud</th>
-        <th>Longitud</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-</div>
-
-<!-- Librerías necesarias -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+<!-- Leaflet -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<!-- Buscador -->
 <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
 <script>
@@ -148,27 +128,11 @@
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  const geocoder = L.Control.geocoder({
-    defaultMarkGeocode: false,
-    placeholder: 'Buscar lugar...'
-  })
-  .on('markgeocode', function(e) {
-    const bbox = e.geocode.bbox;
-    const poly = L.polygon([
-      bbox.getSouthEast(),
-      bbox.getNorthEast(),
-      bbox.getNorthWest(),
-      bbox.getSouthWest()
-    ]).addTo(map);
-    map.fitBounds(poly.getBounds());
-    setTimeout(() => map.removeLayer(poly), 5000);
-  })
-  .addTo(map);
+  // Buscador
+  L.Control.geocoder().addTo(map);
 
   let modoRadio = false;
   let radioCapa = null;
-  let dataTable = null;
-
   const coloresIncidentes = {
     "Quema de basura": "#e67e22",
     "Casa habitacion": "#2980b9",
@@ -179,7 +143,6 @@
     "Negocio plaza comercial mercado": "#d35400",
     "Otro": "#7f8c8d"
   };
-
   let subcapas = {};
 
   fetch('Incendios Urbanos 2022.geojson')
@@ -188,23 +151,18 @@
       data.features.forEach(feature => {
         let tipo = feature.properties.incidente_c4 || "Otro";
         if (!coloresIncidentes[tipo]) tipo = "Otro";
+        if (!subcapas[tipo]) subcapas[tipo] = L.layerGroup();
 
-        if (!subcapas[tipo]) {
-          subcapas[tipo] = L.layerGroup();
-        }
+        const coords = feature.geometry.coordinates;
+        const latlng = [coords[1], coords[0]];
 
-        let latlng = [feature.geometry.coordinates[1], feature.geometry.coordinates[0]];
-
-        let marker = L.circleMarker(latlng, {
+        const marker = L.circleMarker(latlng, {
           radius: 6,
           fillColor: coloresIncidentes[tipo],
           color: '#000',
           weight: 1,
-          opacity: 1,
           fillOpacity: 0.8
-        });
-
-        marker.bindPopup(
+        }).bindPopup(
           `<b>Incidente:</b> ${feature.properties.incidente_c4}<br>` +
           `<b>Alcaldía:</b> ${feature.properties.alcaldia_cierre}<br>` +
           `<b>Colonia:</b> ${feature.properties.colonia_cierre}`
@@ -213,7 +171,7 @@
         subcapas[tipo].addLayer(marker);
       });
 
-      let capasControl = {};
+      const capasControl = {};
       for (const tipo in subcapas) {
         subcapas[tipo].addTo(map);
         capasControl[tipo] = subcapas[tipo];
@@ -222,7 +180,6 @@
       L.control.layers(null, capasControl, { collapsed: false }).addTo(map);
 
       const leyendaDiv = document.getElementById('leyenda');
-      leyendaDiv.innerHTML = '';
       for (const tipo in coloresIncidentes) {
         const color = coloresIncidentes[tipo];
         const div = document.createElement('div');
@@ -230,14 +187,13 @@
         div.innerHTML = `<div class="color-box" style="background:${color}"></div>${tipo}`;
         leyendaDiv.appendChild(div);
       }
-    })
-    .catch(err => alert('Error cargando GeoJSON: ' + err));
+    });
 
   function activarHerramientaRadio() {
     modoRadio = !modoRadio;
-    const radioBtn = document.getElementById('radioBtn');
-    radioBtn.classList.toggle('active');
-    radioBtn.textContent = modoRadio ? '🛑 Cancelar Radio' : '🎯 Activar Radio';
+    const btn = document.getElementById('radioBtn');
+    btn.classList.toggle('active');
+    btn.textContent = modoRadio ? '🛑 Cancelar Radio' : '🎯 Activar Radio';
     if (radioCapa) {
       map.removeLayer(radioCapa);
       radioCapa = null;
@@ -248,16 +204,11 @@
   function limpiarTabla() {
     const tbody = document.querySelector('#tablaResultados tbody');
     tbody.innerHTML = '';
-    document.getElementById('tablaContenedor').hidden = true;
-
-    if (dataTable) {
-      dataTable.clear().draw();
-    }
+    document.getElementById('tablaResultados').hidden = true;
   }
 
   map.on('click', function(e) {
     if (!modoRadio) return;
-
     if (radioCapa) {
       map.removeLayer(radioCapa);
       radioCapa = null;
@@ -288,35 +239,20 @@
       }
     }
 
-    radioCapa.bindPopup(`Incidentes en el radio: <strong>${resultados.length}</strong>`).openPopup();
-
-    // Mostrar tabla con DataTables
-    const tablaContenedor = document.getElementById('tablaContenedor');
-    tablaContenedor.hidden = false;
-
-    if (!dataTable) {
-      dataTable = $('#tablaResultados').DataTable({
-        paging: true,
-        searching: true,
-        info: true,
-        destroy: true, // permite recrear la tabla si ya existe
-        data: resultados,
-        columns: [
-          { data: 'incidente' },
-          { data: 'alcaldia' },
-          { data: 'colonia' },
-          { data: 'latitud' },
-          { data: 'longitud' }
-        ],
-        language: {
-          url: 'https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json'
-        }
+    const tbody = document.querySelector('#tablaResultados tbody');
+    tbody.innerHTML = '';
+    if (resultados.length > 0) {
+      resultados.forEach(r => {
+        let tr = document.createElement('tr');
+        tr.innerHTML = `<td>${r.incidente}</td><td>${r.alcaldia}</td><td>${r.colonia}</td><td>${r.latitud}</td><td>${r.longitud}</td>`;
+        tbody.appendChild(tr);
       });
+      document.getElementById('tablaResultados').hidden = false;
     } else {
-      dataTable.clear();
-      dataTable.rows.add(resultados);
-      dataTable.draw();
+      document.getElementById('tablaResultados').hidden = true;
     }
+
+    radioCapa.bindPopup(`Incidentes en el radio: <strong>${resultados.length}</strong>`).openPopup();
   });
 </script>
 
