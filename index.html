@@ -1,151 +1,215 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="utf-8" />
-<title>Visor de Incendios con Nivel de Riesgo</title>
+<meta charset="UTF-8" />
+<title>Visor de Incendios - Resumen de Riesgo</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <link
   rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"
 />
 <style>
-  #map { height: 90vh; }
-  .info-popup {
-    max-width: 300px;
+  body, html {
+    margin:0; padding:0; height:100%;
     font-family: Arial, sans-serif;
-    font-size: 14px;
   }
-  .info-popup h3 {
-    margin: 0 0 5px;
-    font-size: 16px;
+  #map { height: 60vh; }
+  #summary {
+    padding: 10px;
+    max-height: 35vh;
+    overflow-y: auto;
   }
-  .info-popup table {
-    border-collapse: collapse;
+  table {
     width: 100%;
+    border-collapse: collapse;
   }
-  .info-popup th, .info-popup td {
-    border: 1px solid #ccc;
-    padding: 5px;
-    text-align: left;
+  table, th, td {
+    border: 1px solid #666;
   }
-  .info-popup th {
-    background: #f0f0f0;
+  th, td {
+    padding: 6px;
+    text-align: center;
+  }
+  th {
+    background: #004466;
+    color: white;
   }
 </style>
 </head>
 <body>
-<h2 style="text-align:center; font-family: Arial, sans-serif;">Visor de Incendios Urbanos con Nivel de Riesgo</h2>
+<h2 style="text-align:center; margin:10px;">Visor de Incendios Urbanos 2022</h2>
 <div id="map"></div>
+<div id="summary"><em>Dibuja un círculo para ver el resumen de riesgos dentro del área.</em></div>
 
-<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<script
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+></script>
+<script
+  src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"
+></script>
+
 <script>
-// Datos de riesgos
-const riesgos = {
-  "Incendios forestales": {
-    probabilidad: "Alto",
-    impacto: "Alto",
-    riesgo: "Alto",
-    accionPreventiva: "En la zona se registraron 142 reportes relacionados con incendios forestales y quema de pastizal, vinculados a vegetación seca y condiciones climáticas de sequía estacional. Se recomienda vigilancia constante, capacitación, campañas preventivas, regulación y sanciones."
-  }
-};
+// Inicializar mapa centrado en CDMX
+const map = L.map("map").setView([19.43, -99.13], 11);
 
-// Ejemplo datos geojson simplificado
-const incendios = {
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "properties": { "incidente_c4": "Incendios forestales", "alcaldia_cierre": "MIGUEL HIDALGO" },
-      "geometry": { "type": "Point", "coordinates": [-99.202334, 19.44867] }
-    },
-    {
-      "type": "Feature",
-      "properties": { "incidente_c4": "Casa habitacion", "alcaldia_cierre": "Coyoacan" },
-      "geometry": { "type": "Point", "coordinates": [-99.145727, 19.331269] }
-    }
-    // Agrega más puntos aquí
-  ]
-};
-
-const map = L.map('map').setView([19.43, -99.13], 11);
-
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 19
+// Agregar capa base OSM
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  maxZoom: 19,
+  attribution: "© OpenStreetMap"
 }).addTo(map);
 
-let radioCapa = null;
+// Cargar GeoJSON (puedes poner tu ruta correcta)
+const geojsonURL = "Incendios Urbanos 2022.geojson";
 
-function puntoDentroRadio(latlng, centro, radio) {
-  return centro.distanceTo(latlng) <= radio;
+let incidentsLayer;
+let incidentFeatures = [];
+
+fetch(geojsonURL)
+  .then(res => res.json())
+  .then(data => {
+    incidentFeatures = data.features;
+    incidentsLayer = L.geoJSON(data, {
+      pointToLayer: (feature, latlng) => {
+        return L.circleMarker(latlng, {
+          radius: 6,
+          fillColor: "#ff7800",
+          color: "#000",
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8
+        }).bindPopup(
+          `<b>Incidente:</b> ${feature.properties.incidente_c4}<br/>
+           <b>Alcaldía:</b> ${feature.properties.alcaldia_cierre}<br/>
+           <b>Colonia:</b> ${feature.properties.colonia_cierre}`
+        );
+      }
+    }).addTo(map);
+  });
+
+// Añadir control de dibujo
+const drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+const drawControl = new L.Control.Draw({
+  draw: {
+    polygon: false,
+    polyline: false,
+    rectangle: false,
+    marker: false,
+    circlemarker: false,
+    circle: {
+      shapeOptions: {
+        color: "#3388ff"
+      },
+      metric: true,
+      repeatMode: false
+    }
+  },
+  edit: {
+    featureGroup: drawnItems,
+    remove: true
+  }
+});
+map.addControl(drawControl);
+
+// Función para calcular niveles según cantidad
+function calcularNivel(cantidad) {
+  if (cantidad > 100) return "Alto";
+  if (cantidad > 30) return "Medio";
+  if (cantidad > 0) return "Bajo";
+  return "Ninguno";
 }
 
-map.on('click', function(e) {
-  // Quitar círculo anterior
-  if (radioCapa) {
-    map.removeLayer(radioCapa);
+// Función para generar resumen de riesgo
+function generarResumen(conteos) {
+  const resumen = [];
+  for (const amenaza in conteos) {
+    const cantidad = conteos[amenaza];
+    const probabilidad = calcularNivel(cantidad);
+    const impacto = probabilidad; // simplificado, puede ajustarse
+    const riesgo = probabilidad;  // simplificado, puede ajustarse
+    const accionPreventiva = {
+      "Incendios forestales":
+        "Vigilancia constante, capacitación de brigadas, campañas de prevención y regulación de quemas.",
+      "Quema de basura":
+        "Promover la gestión adecuada de residuos y sancionar quemas irresponsables.",
+      "Casa habitacion":
+        "Mejorar medidas de prevención contra incendios domiciliarios.",
+      "Vehiculo":
+        "Inspección y control de riesgos en vehículos.",
+      "Arbol":
+        "Monitoreo y manejo adecuado de vegetación.",
+      "Industria":
+        "Regulación y supervisión de instalaciones industriales.",
+      "Edificio":
+        "Implementar protocolos de seguridad en edificaciones.",
+      "Negocio plaza comercial mercado":
+        "Capacitación y controles en establecimientos comerciales."
+    }[amenaza] || "Implementar acciones preventivas específicas para esta amenaza.";
+
+    resumen.push({
+      amenaza,
+      probabilidad,
+      impacto,
+      riesgo,
+      accionPreventiva
+    });
   }
-  
-  const radio = 1000; // metros
-  const centro = e.latlng;
-  
-  // Filtrar puntos dentro del radio
-  const puntosDentro = incendios.features.filter(f => {
-    const coords = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
-    const punto = L.latLng(coords);
-    return puntoDentroRadio(punto, centro, radio);
+  return resumen;
+}
+
+// Función para mostrar tabla resumen en el div #summary
+function mostrarResumen(resumen) {
+  if (resumen.length === 0) {
+    document.getElementById("summary").innerHTML = "<em>No hay incidentes dentro del área seleccionada.</em>";
+    return;
+  }
+  let html = `<table><thead><tr>
+    <th>Amenaza</th><th>Probabilidad</th><th>Impacto</th><th>Riesgo</th><th>Acción Preventiva</th>
+  </tr></thead><tbody>`;
+  resumen.forEach(r => {
+    html += `<tr>
+      <td>${r.amenaza}</td>
+      <td>${r.probabilidad}</td>
+      <td>${r.impacto}</td>
+      <td>${r.riesgo}</td>
+      <td style="text-align:left;">${r.accionPreventiva}</td>
+    </tr>`;
+  });
+  html += "</tbody></table>";
+  document.getElementById("summary").innerHTML = html;
+}
+
+// Evento cuando se crea un dibujo
+map.on(L.Draw.Event.CREATED, e => {
+  drawnItems.clearLayers();
+  const layer = e.layer;
+  drawnItems.addLayer(layer);
+
+  const center = layer.getLatLng();
+  const radius = layer.getRadius();
+
+  // Filtrar incidentes dentro del círculo
+  const dentro = incidentFeatures.filter(f => {
+    const coords = f.geometry.coordinates; // [long, lat]
+    const latlng = L.latLng(coords[1], coords[0]);
+    return latlng.distanceTo(center) <= radius;
   });
 
-  // Contar incidencias y riesgo máximo
-  let riesgoMax = "Bajo";
-  const nivelesRiesgo = { "Bajo": 1, "Medio": 2, "Alto": 3 };
-  let maxNivel = 0;
-  let amenazaMasRelevante = null;
-
-  puntosDentro.forEach(p => {
-    const amenaza = p.properties.incidente_c4;
-    if (riesgos[amenaza]) {
-      const nivel = nivelesRiesgo[riesgos[amenaza].riesgo] || 1;
-      if (nivel > maxNivel) {
-        maxNivel = nivel;
-        riesgoMax = riesgos[amenaza].riesgo;
-        amenazaMasRelevante = amenaza;
-      }
-    }
+  // Contar por tipo de incidente
+  const conteos = {};
+  dentro.forEach(f => {
+    const tipo = f.properties.incidente_c4 || "Desconocido";
+    conteos[tipo] = (conteos[tipo] || 0) + 1;
   });
 
-  // Elegir color según riesgo
-  let colorCirculo = '#28a745'; // verde bajo
-  if (riesgoMax === "Alto") colorCirculo = '#dc3545';
-  else if (riesgoMax === "Medio") colorCirculo = '#ffc107';
-
-  radioCapa = L.circle(centro, {
-    radius: radio,
-    color: colorCirculo,
-    fillColor: colorCirculo,
-    fillOpacity: 0.3
-  }).addTo(map);
-
-  // Crear contenido del popup
-  let contenido = `<div class="info-popup">
-    <b>Incidentes en radio ${radio} m:</b> ${puntosDentro.length}<br>
-    <b>Nivel de riesgo:</b> ${riesgoMax}<br><br>`;
-
-  if (amenazaMasRelevante) {
-    const info = riesgos[amenazaMasRelevante];
-    contenido += `<h3>${amenazaMasRelevante}</h3>
-      <table>
-        <tr><th>Probabilidad</th><td>${info.probabilidad}</td></tr>
-        <tr><th>Impacto</th><td>${info.impacto}</td></tr>
-        <tr><th>Riesgo</th><td>${info.riesgo}</td></tr>
-        <tr><th>Acción preventiva</th><td>${info.accionPreventiva}</td></tr>
-      </table>`;
-  } else {
-    contenido += `<p>No hay información detallada de riesgos para los incidentes en esta área.</p>`;
-  }
-
-  contenido += `</div>`;
-
-  radioCapa.bindPopup(contenido).openPopup();
+  // Generar resumen y mostrarlo
+  const resumen = generarResumen(conteos);
+  mostrarResumen(resumen);
 });
 </script>
 </body>
