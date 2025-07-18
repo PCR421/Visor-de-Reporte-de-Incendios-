@@ -15,6 +15,9 @@
   #results { max-height: 25vh; overflow-y: auto; margin-top: 10px; border: 1px solid #ccc; padding: 5px; font-size: 14px; }
   .legend { background: white; padding: 6px; line-height: 1.4em; }
   .legend-color { display: inline-block; width: 15px; height: 15px; margin-right: 6px; vertical-align: middle; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #999; padding: 4px; text-align: left; font-size: 13px; }
+  th { background-color: #eee; }
 </style>
 </head>
 <body>
@@ -30,27 +33,26 @@
 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<!-- Load GeoJSON with fetch API -->
 
 <script>
-  // Inicializar mapa
+  // --- Inicialización del mapa ---
   var map = L.map('map').setView([19.43, -99.13], 11);
 
-  // Capa base
+  // Capa base OpenStreetMap
   var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© OpenStreetMap'
   }).addTo(map);
 
-  // Variables
-  var geojsonUrl = 'Incendios Urbanos 2022.geojson'; // archivo en misma carpeta
-  var incendioLayer;
-  var radiusCircle;
-  var modoRadio = false;
+  // --- Variables globales ---
+  var geojsonUrl = 'Incendios Urbanos 2022.geojson'; // Debe estar en la misma carpeta
+  var incendioLayer;       // Layer con puntos
+  var radiusCircle;        // Círculo del radio
+  var modoRadio = false;   // Estado modo radio activo o no
   var resultsDiv = document.getElementById('results');
   var toggleBtn = document.getElementById('toggleRadiusBtn');
 
-  // Colores para clasificación (puedes ajustar)
+  // Colores por tipo de incidente
   var colores = {
     'Quema de basura': '#FF5733',
     'Casa habitacion': '#33C1FF',
@@ -62,21 +64,21 @@
     'Otros': '#888888'
   };
 
-  // Función para elegir color según incidente
+  // Función para obtener color según tipo
   function getColor(tipo) {
     return colores[tipo] || colores['Otros'];
   }
 
-  // Función para crear popup info
+  // Función para mostrar info en popup
   function onEachFeature(feature, layer) {
-    var props = feature.properties;
-    var html = '<b>Incidente:</b> ' + props.incidente_c4 + '<br>' +
-               '<b>Alcaldía:</b> ' + props.alcaldia_cierre + '<br>' +
-               '<b>Colonia:</b> ' + props.colonia_cierre;
+    var p = feature.properties;
+    var html = `<b>Incidente:</b> ${p.incidente_c4}<br>
+                <b>Alcaldía:</b> ${p.alcaldia_cierre}<br>
+                <b>Colonia:</b> ${p.colonia_cierre}`;
     layer.bindPopup(html);
   }
 
-  // Cargar GeoJSON y crear layer
+  // --- Cargar GeoJSON y crear layer ---
   fetch(geojsonUrl)
     .then(response => response.json())
     .then(data => {
@@ -99,7 +101,7 @@
       resultsDiv.innerHTML = "Error cargando datos: " + err;
     });
 
-  // Leyenda
+  // --- Leyenda ---
   function agregarLeyenda() {
     var legend = L.control({position: 'bottomright'});
     legend.onAdd = function (map) {
@@ -107,15 +109,14 @@
       div.innerHTML = '<b>Incidentes</b><br>';
       for (var tipo in colores) {
         div.innerHTML +=
-          '<span class="legend-color" style="background:' + colores[tipo] + '"></span>' +
-          tipo + '<br>';
+          `<span class="legend-color" style="background:${colores[tipo]}"></span>${tipo}<br>`;
       }
       return div;
     };
     legend.addTo(map);
   }
 
-  // Manejo del modo radio 500m
+  // --- Botón modo radio ---
   toggleBtn.onclick = function() {
     modoRadio = !modoRadio;
     if (modoRadio) {
@@ -130,24 +131,23 @@
         map.removeLayer(radiusCircle);
         radiusCircle = null;
       }
-      // Restaurar todos los puntos visibles
+      // Restaurar visibilidad total
       if (incendioLayer) incendioLayer.eachLayer(function(layer) {
         layer.setStyle({opacity:1, fillOpacity:0.8});
       });
     }
   };
 
-  // Al hacer click en el mapa en modo radio
+  // --- Función al hacer clic en mapa con modo radio activado ---
   function onMapClickRadio(e) {
     if (radiusCircle) map.removeLayer(radiusCircle);
 
     radiusCircle = L.circle(e.latlng, {radius: 500, color: 'red', weight: 2, fillOpacity: 0.1}).addTo(map);
 
-    // Filtrar puntos dentro del radio
     var puntosDentro = [];
     incendioLayer.eachLayer(function(layer) {
-      var distancia = map.distance(e.latlng, layer.getLatLng());
-      if (distancia <= 500) {
+      var dist = map.distance(e.latlng, layer.getLatLng());
+      if (dist <= 500) {
         layer.setStyle({opacity:1, fillOpacity:0.8});
         puntosDentro.push(layer.feature.properties);
       } else {
@@ -155,25 +155,28 @@
       }
     });
 
-    // Mostrar resultados en tabla simplificada
     mostrarResultados(puntosDentro);
   }
 
-  // Mostrar resultados en div
+  // --- Mostrar tabla y cálculo de riesgo ---
   function mostrarResultados(puntos) {
     if (puntos.length === 0) {
       resultsDiv.innerHTML = "No se encontraron incidentes dentro del radio de 500m.";
       return;
     }
-    var html = '<b>Incidentes dentro de 500m: ' + puntos.length + '</b><br><table border="1" cellpadding="3" style="border-collapse: collapse; width: 100%;">';
-    html += '<tr><th>Incidente</th><th>Alcaldía</th><th>Colonia</th></tr>';
+
+    // Tabla con atributos
+    var html = `<b>Incidentes dentro de 500m: ${puntos.length}</b><br>
+                <table>
+                <tr><th>Incidente</th><th>Alcaldía</th><th>Colonia</th></tr>`;
+
     puntos.forEach(function(p) {
-      html += '<tr><td>' + p.incidente_c4 + '</td><td>' + p.alcaldia_cierre + '</td><td>' + p.colonia_cierre + '</td></tr>';
+      html += `<tr><td>${p.incidente_c4}</td><td>${p.alcaldia_cierre}</td><td>${p.colonia_cierre}</td></tr>`;
     });
+
     html += '</table>';
 
-    // Aquí puedes agregar el cálculo básico de probabilidad, impacto y riesgo según cantidad
-    // Por ejemplo:
+    // Clasificación simple de probabilidad, impacto y riesgo según cantidad
     var probabilidad = 'Bajo', impacto = 'Bajo', riesgo = 'Bajo';
     if (puntos.length > 50) {
       probabilidad = 'Alto';
@@ -184,6 +187,7 @@
       impacto = 'Medio';
       riesgo = 'Medio';
     }
+
     html += `<br><b>Probabilidad:</b> ${probabilidad} | <b>Impacto:</b> ${impacto} | <b>Riesgo:</b> ${riesgo}`;
 
     resultsDiv.innerHTML = html;
