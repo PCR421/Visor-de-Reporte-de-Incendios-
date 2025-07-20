@@ -179,7 +179,6 @@
     const contenedorResumen = document.getElementById('contenedorResumen');
     const divClasificacion = document.getElementById('clasificacion');
     const radioBtn = document.getElementById('radioBtn');
-    const leyendaDiv = document.getElementById('leyenda');
 
     fetch('Incendios Urbanos 2022.geojson')
       .then(res => res.json())
@@ -231,7 +230,7 @@
 
         L.control.layers(null, capasControl, { collapsed: false }).addTo(map);
 
-        // Removí la leyenda porque pediste que no esté duplicada
+        // No mostramos la leyenda para evitar duplicados.
       })
       .catch(err => alert('Error cargando GeoJSON: ' + err));
 
@@ -278,11 +277,14 @@
       let conteo = 0;
       let resultados = [];
       let conteoPorCategoria = {};
+      let idsContados = new Set();
 
       for (const tipo in subcapas) {
         if (map.hasLayer(subcapas[tipo])) {
           subcapas[tipo].eachLayer(function(layer) {
-            if (layer.getLatLng && e.latlng.distanceTo(layer.getLatLng()) <= 500) {
+            const idUnico = layer.getLatLng().lat.toFixed(6) + ',' + layer.getLatLng().lng.toFixed(6);
+            if (!idsContados.has(idUnico) && e.latlng.distanceTo(layer.getLatLng()) <= 500) {
+              idsContados.add(idUnico);
               conteo++;
               const props = layer.feature?.properties;
               resultados.push({
