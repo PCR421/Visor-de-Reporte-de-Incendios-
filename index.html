@@ -97,7 +97,7 @@
     #contenedorTabla {
       margin: 10px 20px 20px;
       resize: vertical;
-      overflow: auto;
+      overflow-y: auto;
       min-height: 100px;
       max-height: 40vh;
       border: 1px solid #ccc;
@@ -108,6 +108,7 @@
       width: 100%;
       border-collapse: collapse;
       font-size: 0.9rem;
+      table-layout: fixed;
     }
 
     #tablaResultados thead {
@@ -118,9 +119,9 @@
       z-index: 2;
     }
 
+    /* No display block para tbody para que no se junte todo */
     #tablaResultados tbody {
-      display: block;
-      overflow-y: auto;
+      /* display: block;  <-- eliminado para estructura normal */
     }
 
     #tablaResultados th, #tablaResultados td {
@@ -128,7 +129,7 @@
       text-align: left;
       vertical-align: middle;
       border: 1px solid #ccc;
-      width: 20%;
+      word-wrap: break-word;
     }
 
     #clasificacion {
