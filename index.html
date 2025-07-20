@@ -72,27 +72,7 @@
       z-index: 0;
     }
 
-    .leyenda {
-      display: flex;
-      flex-wrap: wrap;
-      margin: 10px 20px;
-      gap: 15px;
-      user-select: none;
-    }
-
-    .item-leyenda {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 600;
-      font-size: 0.9rem;
-    }
-
-    .color-box {
-      width: 16px;
-      height: 16px;
-      border-radius: 3px;
-    }
+    /* Leyenda eliminada */
 
     #contenedorTabla {
       margin: 10px 20px 20px;
@@ -119,9 +99,8 @@
       z-index: 2;
     }
 
-    /* No display block para tbody para que no se junte todo */
     #tablaResultados tbody {
-      /* display: block;  <-- eliminado para estructura normal */
+      /* tbody normal, sin display block */
     }
 
     #tablaResultados th, #tablaResultados td {
@@ -145,7 +124,8 @@
   <div id="titulo">Visor de Incendios Urbanos CDMX</div>
   <div id="radioBtn" onclick="activarHerramientaRadio()">🎯 Activar Radio</div>
   <div id="map"></div>
-  <div class="leyenda" id="leyenda"></div>
+  <!-- Leyenda removida -->
+  <!-- <div class="leyenda" id="leyenda"></div> -->
 
   <div id="contenedorTabla" hidden>
     <table id="tablaResultados">
@@ -194,7 +174,8 @@
     const contenedorTabla = document.getElementById('contenedorTabla');
     const divClasificacion = document.getElementById('clasificacion');
     const radioBtn = document.getElementById('radioBtn');
-    const leyendaDiv = document.getElementById('leyenda');
+    // Leyenda removida
+    // const leyendaDiv = document.getElementById('leyenda');
 
     fetch('Incendios Urbanos 2022.geojson')
       .then(res => res.json())
@@ -244,16 +225,27 @@
           capasControl[tipo] = subcapas[tipo];
         }
 
-        L.control.layers(null, capasControl, { collapsed: false }).addTo(map);
+        // Guardamos la referencia del control para modificarlo
+        const controlCapas = L.control.layers(null, capasControl, { collapsed: false }).addTo(map);
 
-        leyendaDiv.innerHTML = '';
-        for (const tipo in coloresIncidentes) {
-          const color = coloresIncidentes[tipo];
-          const div = document.createElement('div');
-          div.className = 'item-leyenda';
-          div.innerHTML = `<div class="color-box" style="background:${color}"></div>${tipo}`;
-          leyendaDiv.appendChild(div);
-        }
+        // Después de que el control se agregó, modificamos su DOM para agregar los cuadros de color
+        setTimeout(() => {
+          const labels = document.querySelectorAll('.leaflet-control-layers-overlays label');
+          labels.forEach(label => {
+            const text = label.textContent.trim();
+            if (coloresIncidentes[text]) {
+              const colorBox = document.createElement('span');
+              colorBox.style.backgroundColor = coloresIncidentes[text];
+              colorBox.style.width = '16px';
+              colorBox.style.height = '16px';
+              colorBox.style.display = 'inline-block';
+              colorBox.style.marginRight = '6px';
+              colorBox.style.borderRadius = '3px';
+              label.prepend(colorBox);
+            }
+          });
+        }, 300);
+
       })
       .catch(err => alert('Error cargando GeoJSON: ' + err));
 
