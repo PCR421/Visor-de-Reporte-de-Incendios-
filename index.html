@@ -81,11 +81,11 @@
       padding: 10px;
       border-radius: 4px;
       display: none;
-      user-select: none;
+      user-select: text; /* Permite seleccionar y copiar el texto */
     }
 
     #contenedorTabla {
-      margin: 10px 20px 20px 20px;
+      margin: 10px 20px 20px;
       resize: vertical;
       overflow-y: auto;
       min-height: 100px;
@@ -130,9 +130,7 @@
   <div id="titulo">Visor de Incendios Urbanos CDMX</div>
   <div id="radioBtn" onclick="activarHerramientaRadio()">🎯 Activar Radio</div>
   <div id="map"></div>
-
   <div id="contenedorResumen"></div>
-
   <div id="contenedorTabla" hidden>
     <table id="tablaResultados">
       <thead>
@@ -178,9 +176,9 @@
     const tablaResultados = document.getElementById('tablaResultados');
     const tbodyResultados = tablaResultados.querySelector('tbody');
     const contenedorTabla = document.getElementById('contenedorTabla');
+    const contenedorResumen = document.getElementById('contenedorResumen');
     const divClasificacion = document.getElementById('clasificacion');
     const radioBtn = document.getElementById('radioBtn');
-    const contenedorResumen = document.getElementById('contenedorResumen');
     const leyendaDiv = document.getElementById('leyenda');
 
     fetch('Incendios Urbanos 2022.geojson')
@@ -232,6 +230,8 @@
         }
 
         L.control.layers(null, capasControl, { collapsed: false }).addTo(map);
+
+        // Removí la leyenda porque pediste que no esté duplicada
       })
       .catch(err => alert('Error cargando GeoJSON: ' + err));
 
@@ -251,7 +251,6 @@
     function limpiarTabla() {
       tbodyResultados.innerHTML = '';
       contenedorTabla.hidden = true;
-      contenedorResumen.style.display = 'none';
     }
 
     function clasificarRiesgo(cantidad) {
@@ -281,15 +280,10 @@
       let conteoPorCategoria = {};
 
       for (const tipo in subcapas) {
-        conteoPorCategoria[tipo] = 0;
-      }
-
-      for (const tipo in subcapas) {
         if (map.hasLayer(subcapas[tipo])) {
           subcapas[tipo].eachLayer(function(layer) {
             if (layer.getLatLng && e.latlng.distanceTo(layer.getLatLng()) <= 500) {
               conteo++;
-              conteoPorCategoria[tipo]++;
               const props = layer.feature?.properties;
               resultados.push({
                 incidente: props?.incidente_c4 ?? "Otro",
@@ -298,6 +292,7 @@
                 latitud: layer.getLatLng().lat.toFixed(6),
                 longitud: layer.getLatLng().lng.toFixed(6)
               });
+              conteoPorCategoria[props?.incidente_c4 ?? "Otro"] = (conteoPorCategoria[props?.incidente_c4 ?? "Otro"] || 0) + 1;
             }
           });
         }
@@ -313,23 +308,26 @@
           tbodyResultados.appendChild(tr);
         });
         contenedorTabla.hidden = false;
+
+        // Construir texto resumen formal
+        let resumen = `Del año 2022, dentro de un radio de 500 metros se registraron ${conteo} incidentes en total, distribuidos por categoría de la siguiente manera: `;
+        const categorias = Object.keys(conteoPorCategoria);
+        categorias.forEach((cat, index) => {
+          resumen += `${conteoPorCategoria[cat]} casos de "${cat}"`;
+          if (index < categorias.length - 2) {
+            resumen += ', ';
+          } else if (index === categorias.length - 2) {
+            resumen += ' y ';
+          } else {
+            resumen += '.';
+          }
+        });
+
+        contenedorResumen.textContent = resumen;
+        contenedorResumen.style.display = 'block';
+
       } else {
         contenedorTabla.hidden = true;
-      }
-
-      // Construir texto resumen
-      if (conteo > 0) {
-        let resumen = `De acuerdo con los registros oficiales de llamadas al 911 del año 2022, proporcionados por el gobierno, en un radio de 500 metros se registraron <strong>${conteo}</strong> incidentes. Distribución por categoría: `;
-        let partes = [];
-        for (const categoria in conteoPorCategoria) {
-          if (conteoPorCategoria[categoria] > 0) {
-            partes.push(`${categoria}: ${conteoPorCategoria[categoria]}`);
-          }
-        }
-        resumen += partes.join(', ') + '.';
-        contenedorResumen.innerHTML = resumen;
-        contenedorResumen.style.display = 'block';
-      } else {
         contenedorResumen.style.display = 'none';
       }
 
